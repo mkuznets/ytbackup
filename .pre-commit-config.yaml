@@ -7,4 +7,4 @@ repos:
         entry: go generate ./...
         language: system
         pass_filenames: false
-        files: \.go$
+        files: \.(go|py)$
