@@ -12,8 +12,27 @@ import (
 	"go.uber.org/config"
 )
 
-func New(path string, basename string, defaults string, cfg interface{}) error {
-	copts, err := configOptions(path, basename, defaults)
+type Config interface {
+	Validate() error
+}
+
+type Reader struct {
+	filename, explicitPath, defaultConfig string
+}
+
+func New(filename string, opts ...Option) *Reader {
+	r := new(Reader)
+	r.filename = filename
+
+	for _, opt := range opts {
+		opt(r)
+	}
+
+	return r
+}
+
+func (r *Reader) Read(cfg Config) error {
+	copts, err := r.yamlOptions()
 	if err != nil {
 		return err
 	}
@@ -27,26 +46,28 @@ func New(path string, basename string, defaults string, cfg interface{}) error {
 		return err
 	}
 
-	return nil
+	return cfg.Validate()
 }
 
-func configOptions(path string, basename string, defaults string) ([]config.YAMLOption, error) {
-	options := make([]config.YAMLOption, 0)
+func (r *Reader) yamlOptions() ([]config.YAMLOption, error) {
+	options := make([]config.YAMLOption, 0, 3)
 
 	// Default config
-	options = append(options, config.Source(strings.NewReader(defaults)))
+	if r.defaultConfig != "" {
+		options = append(options, config.Source(strings.NewReader(r.defaultConfig)))
+	}
 
-	// Alternative config from one of default paths
 	home, err := homedir.Dir()
 	if err != nil {
 		return nil, err
 	}
 
+	// Alternative config from one of default paths
 	altPath := ""
 	if configHome, ok := os.LookupEnv("XDG_CONFIG_HOME"); ok {
-		altPath = filepath.Join(configHome, basename)
+		altPath = filepath.Join(configHome, r.filename)
 	} else {
-		altPath = filepath.Join(home, ".config", basename)
+		altPath = filepath.Join(home, ".config", r.filename)
 	}
 
 	content, err := ioutil.ReadFile(altPath)
@@ -55,9 +76,9 @@ func configOptions(path string, basename string, defaults string) ([]config.YAML
 		options = append(options, config.Source(bytes.NewBuffer(content)))
 	}
 
-	// Primary config passed via CLI arguments
-	if path != "" {
-		absPath, err := homedir.Expand(path)
+	// Explicit config passed via CLI arguments
+	if r.explicitPath != "" {
+		absPath, err := homedir.Expand(r.explicitPath)
 		if err != nil {
 			return nil, err
 		}

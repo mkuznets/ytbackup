@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/go-pkgz/repeater"
-	"github.com/mitchellh/go-homedir"
 )
 
 type Browser struct {
@@ -30,18 +29,14 @@ func New(executable string, dataDir string, port int, extraArgs map[string]strin
 	}
 
 	if dataDir != "" {
-		absDataDir, err := homedir.Expand(dataDir)
-		if err != nil {
-			return nil, err
-		}
-		fi, err := os.Stat(absDataDir)
+		fi, err := os.Stat(dataDir)
 		if err != nil {
 			return nil, err
 		}
 		if !fi.IsDir() {
 			return nil, errors.New("invalid data directory")
 		}
-		args["--user-data-dir"] = absDataDir
+		args["--user-data-dir"] = dataDir
 	}
 	args["--headless"] = ""
 	args["--remote-debugging-port"] = fmt.Sprintf("%d", port)
@@ -73,7 +68,7 @@ func (b *Browser) Run(ctx context.Context) error {
 		if errors.Is(ctxTimeout.Err(), context.Canceled) {
 			return nil
 		}
-		log.Print("browser error: %v", err)
+		log.Printf("browser error: %v", err)
 		return err
 	}
 	return nil

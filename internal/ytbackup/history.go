@@ -13,11 +13,9 @@ type HistoryCommand struct {
 }
 
 func (cmd *HistoryCommand) Execute(args []string) error {
-	if err := cmd.Config.ValidateForHistory(); err != nil {
-		return err
-	}
 
 	bcfg := cmd.Config.Browser
+
 	bro, err := ytbrowser.New(bcfg.Executable, bcfg.DataDir, bcfg.DebugPort, bcfg.ExtraArgs)
 	if err != nil {
 		return err
