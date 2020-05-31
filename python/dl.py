@@ -151,7 +151,7 @@ class Info:
                 'id': data['id'],
                 'url': data['webpage_url'],
                 'is_live': bool(data['is_live']),
-                'duration': data['duration'],
+                'duration': int(data['duration'] or 0),
             })
 
         ydl = youtube_dl.YoutubeDL(Preset().info_opts)
