@@ -5,18 +5,11 @@ import (
 	"os"
 
 	"github.com/jessevdk/go-flags"
-	"mkuznets.com/go/ytbackup/internal/ytbackup"
 )
 
 type Commander interface {
 	Init(opts interface{}) error
 	Execute(args []string) error
-}
-
-type Options struct {
-	Common  *ytbackup.Options        `group:"Common Options"`
-	History *ytbackup.HistoryCommand `command:"history" description:"show latest watched videos"`
-	Config  *ytbackup.ConfigCommand  `command:"config" description:"show current config"`
 }
 
 func main() {
