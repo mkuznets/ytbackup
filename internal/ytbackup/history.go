@@ -13,7 +13,6 @@ type HistoryCommand struct {
 }
 
 func (cmd *HistoryCommand) Execute(args []string) error {
-
 	bcfg := cmd.Config.Browser
 
 	bro, err := ytbrowser.New(bcfg.Executable, bcfg.DataDir, bcfg.DebugPort, bcfg.ExtraArgs)
@@ -25,9 +24,9 @@ func (cmd *HistoryCommand) Execute(args []string) error {
 
 	var videos []history.Video
 	err = bro.Do(ctx, func(ctx context.Context, url string) error {
-		vs, err := history.Videos(ctx, url)
-		if err != nil {
-			return err
+		vs, e := history.Videos(ctx, url)
+		if e != nil {
+			return e
 		}
 		videos = vs
 		return nil

@@ -9,6 +9,8 @@ import (
 )
 
 const configDefaults = `
+python:
+  executable: python
 browser:
   executable: chromium
   debug_port: 9222
@@ -17,6 +19,9 @@ browser:
 type Config struct {
 	History struct {
 		Enable bool
+	}
+	Python struct {
+		Executable string `yaml:"executable"`
 	}
 	Browser struct {
 		Executable string            `yaml:"executable"`
@@ -63,8 +68,7 @@ type Options struct {
 
 // Command is a common part of all subcommands.
 type Command struct {
-	Config  *Config
-	workdir string
+	Config *Config
 }
 
 func (cmd *Command) Init(opts interface{}) error {

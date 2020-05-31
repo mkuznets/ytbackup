@@ -8,3 +8,9 @@ repos:
         language: system
         pass_filenames: false
         files: \.(go|py)$
+
+  - repo: git://github.com/golangci/golangci-lint
+    rev: v1.27.0
+    hooks:
+      - id: golangci-lint
+        entry: golangci-lint run -c .golangci.yml

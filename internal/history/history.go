@@ -39,10 +39,8 @@ func Videos(ctx context.Context, debugURL string) ([]Video, error) {
 		return nil, err
 	}
 
-	if err := chromedp.Run(ctxt,
-		browser.Close(),
-	); err != nil {
-		log.Fatal(err)
+	if err := chromedp.Run(ctxt, browser.Close()); err != nil {
+		return nil, err
 	}
 
 	return decodeVideos(res), nil

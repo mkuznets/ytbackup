@@ -22,7 +22,7 @@ type Browser struct {
 	execArgs   []string
 }
 
-func New(executable string, dataDir string, port int, extraArgs map[string]string) (*Browser, error) {
+func New(executable, dataDir string, port int, extraArgs map[string]string) (*Browser, error) {
 	args := extraArgs
 	if args == nil {
 		args = make(map[string]string)
@@ -95,14 +95,14 @@ func (b *Browser) DebugURL(ctx context.Context) (string, error) {
 	}
 
 	var data struct {
-		Url string `json:"webSocketDebuggerUrl"`
+		URL string `json:"webSocketDebuggerUrl"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
 		return "", err
 	}
 
-	return data.Url, nil
+	return data.URL, nil
 }
 
 func (b *Browser) Do(ctx context.Context, f func(ctx context.Context, url string) error) error {
@@ -112,8 +112,9 @@ func (b *Browser) Do(ctx context.Context, f func(ctx context.Context, url string
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	wg.Add(1)
+
 	go func() {
-		wg.Add(1)
 		defer wg.Done()
 		if err := b.Run(ctx); err != nil {
 			log.Print(err)

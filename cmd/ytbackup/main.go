@@ -31,8 +31,7 @@ func main() {
 	}
 
 	if _, err := parser.Parse(); err != nil {
-		switch e := err.(type) {
-		case *flags.Error:
+		if e, ok := err.(*flags.Error); ok {
 			if e.Type == flags.ErrHelp {
 				os.Exit(0)
 			}
