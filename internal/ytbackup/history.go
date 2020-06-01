@@ -22,13 +22,13 @@ func (cmd *HistoryCommand) Execute(args []string) error {
 
 	ctx := context.Background()
 
-	var videos []history.Video
+	var videos []*history.Video
 	err = bro.Do(ctx, func(ctx context.Context, url string) error {
-		vs, e := history.Videos(ctx, url)
+		var e error
+		videos, e = history.Videos(ctx, url)
 		if e != nil {
 			return e
 		}
-		videos = vs
 		return nil
 	})
 	if err != nil {

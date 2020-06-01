@@ -1,15 +1,12 @@
 package history
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"log"
 
 	"github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/chromedp"
+	"mkuznets.com/go/ytbackup/internal/utils"
 )
 
 const (
@@ -23,7 +20,7 @@ type Video struct {
 	URL string `json:"url"`
 }
 
-func Videos(ctx context.Context, debugURL string) ([]Video, error) {
+func Videos(ctx context.Context, debugURL string) ([]*Video, error) {
 	allocatorContext, cancel := chromedp.NewRemoteAllocator(ctx, debugURL)
 	defer cancel()
 
@@ -32,10 +29,11 @@ func Videos(ctx context.Context, debugURL string) ([]Video, error) {
 
 	var res []byte
 
-	if err := chromedp.Run(ctxt,
+	actions := []chromedp.Action{
 		chromedp.Navigate(ytHistoryURL),
 		chromedp.Evaluate(ytDataKey, &res),
-	); err != nil {
+	}
+	if err := chromedp.Run(ctxt, actions...); err != nil {
 		return nil, err
 	}
 
@@ -43,37 +41,15 @@ func Videos(ctx context.Context, debugURL string) ([]Video, error) {
 		return nil, err
 	}
 
-	return decodeVideos(res), nil
-}
+	videos := make([]*Video, 0, 200)
 
-func decodeVideos(data []byte) []Video {
-	videos := make([]Video, 0)
-	lastID := ""
-
-	idKey := false
-	dec := json.NewDecoder(bytes.NewBuffer(data))
-	for {
-		t, err := dec.Token()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if v, ok := t.(string); ok {
-			if v == "videoId" {
-				idKey = true
-				continue
-			}
-			if idKey && lastID != v {
-				url := fmt.Sprintf(ytVideoURLFormat, v)
-				videos = append(videos, Video{v, url})
-				lastID = v
-			}
-		}
-		idKey = false
+	err := utils.ExtractByKey(res, "videoId", func(id string) {
+		url := fmt.Sprintf(ytVideoURLFormat, id)
+		videos = append(videos, &Video{id, url})
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	return videos
+	return videos, nil
 }
