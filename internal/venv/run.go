@@ -23,6 +23,9 @@ func (v *VirtualEnv) RunScript(ctx context.Context, result interface{}, args ...
 	if len(args) < 1 {
 		panic("expected at least one argument")
 	}
+	if v.fs == nil {
+		return errors.New("scripts filesystem is not configured")
+	}
 
 	f, err := v.fs.Open(args[0])
 	if err != nil {
