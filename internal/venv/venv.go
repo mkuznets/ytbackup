@@ -11,8 +11,6 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
-
-	"github.com/rakyll/statik/fs"
 )
 
 type VirtualEnv struct {
@@ -25,17 +23,11 @@ type VirtualEnv struct {
 }
 
 func New(rootDir string, opts ...Option) (*VirtualEnv, error) {
-	scriptFS, err := fs.New()
-	if err != nil {
-		return nil, err
-	}
-
 	venv := &VirtualEnv{
 		dir:          rootDir,
 		python:       filepath.Join(rootDir, "bin", "python"),
 		pip:          filepath.Join(rootDir, "bin", "pip"),
 		systemPython: "python",
-		fs:           scriptFS,
 	}
 	for _, opt := range opts {
 		opt(venv)

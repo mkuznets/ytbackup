@@ -19,7 +19,7 @@ func (se *ScriptError) Error() string {
 	return se.ErrorText
 }
 
-func (v *VirtualEnv) Run(ctx context.Context, result interface{}, args ...string) error {
+func (v *VirtualEnv) RunScript(ctx context.Context, result interface{}, args ...string) error {
 	if len(args) < 1 {
 		panic("expected at least one argument")
 	}
