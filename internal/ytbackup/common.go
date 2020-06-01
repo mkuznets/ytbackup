@@ -1,11 +1,13 @@
 package ytbackup
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 
 	"github.com/mitchellh/go-homedir"
 	"mkuznets.com/go/ytbackup/internal/config"
+	"mkuznets.com/go/ytbackup/internal/database"
 )
 
 const configDefaults = `
@@ -68,6 +70,7 @@ type Options struct {
 
 // Command is a common part of all subcommands.
 type Command struct {
+	DB     *sql.DB
 	Config *Config
 }
 
@@ -85,10 +88,16 @@ func (cmd *Command) Init(opts interface{}) error {
 		config.WithDefaults(configDefaults),
 	)
 	if err := reader.Read(&cfg); err != nil {
-		return err
+		return fmt.Errorf("could not read config: %v", err)
 	}
 
 	cmd.Config = &cfg
+
+	db, err := database.New()
+	if err != nil {
+		return fmt.Errorf("could not initialise database: %v", err)
+	}
+	cmd.DB = db
 
 	return nil
 }
