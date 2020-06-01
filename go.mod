@@ -10,5 +10,4 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/rakyll/statik v0.1.7
 	go.uber.org/config v1.4.0
-	gopkg.in/yaml.v2 v2.3.0 // indirect
 )
