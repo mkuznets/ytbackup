@@ -16,6 +16,7 @@ import typing
 from unittest import mock
 
 TEMP_ROOT = os.path.join(tempfile.gettempdir(), 'ytbackup')
+STDERR = sys.stderr
 
 
 # ------------------------------------------------------------------------------
@@ -29,6 +30,7 @@ class YDLOpts:
         'call_home': False,
         'ignoreerrors': False,
         'geo_bypass': True,
+        'verbose': True,
     }
     download = {
         'write_all_thumbnails': True,
@@ -107,14 +109,19 @@ def suppress_output():
             yield
 
 
-def create_logger(filename):
-    logger = logging.Logger("log")
+def create_logger(filename: typing.Optional[str] = None):
+    logger = logging.getLogger("log")
     logger.setLevel(logging.DEBUG)
-    f = open(filename, 'a+')
 
-    handler = logging.StreamHandler(f)
+    stream = STDERR
+    if filename:
+        stream = open(filename, 'a+')
+
+    handler = logging.StreamHandler(stream)
+
     fmt = logging.Formatter('%(asctime)s\t%(levelname)s\t%(message)s')
     handler.setFormatter(fmt)
+    handler.setLevel(logging.DEBUG)
 
     logger.addHandler(handler)
 
@@ -170,17 +177,13 @@ class Download:
 
         self.urls: typing.List[str] = args.urls
 
-        logger = None
-        if args.log:
-            logger = create_logger(args.log)
+        logger = create_logger(args.log or None)
 
         opts: dict = getattr(Preset(logger=logger), args.preset)
         opts['outtmpl'] = os.path.join(
             self.output_dir, '%(upload_date)s_%(id)s/%(id)s.%(ext)s'
         )
-
-        if logger:
-            opts['progress_hooks'] = [create_hook(logger)]
+        opts['progress_hooks'] = [create_hook(logger)]
 
         self.opts = opts
 
