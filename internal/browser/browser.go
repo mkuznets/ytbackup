@@ -39,6 +39,7 @@ func New(executable, dataDir string, port int, extraArgs map[string]string) (*Br
 		args["--user-data-dir"] = dataDir
 	}
 	args["--headless"] = ""
+	args["--window-size"] = "1920,1080"
 	args["--remote-debugging-port"] = fmt.Sprintf("%d", port)
 
 	execArgs := make([]string, 0, 2*len(args))
