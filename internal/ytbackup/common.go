@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
 
 	"github.com/mitchellh/go-homedir"
 	"mkuznets.com/go/ytbackup/internal/config"
@@ -31,6 +33,7 @@ type Config struct {
 		DataDir    string            `yaml:"data_dir"`
 		ExtraArgs  map[string]string `yaml:"extra_args"`
 	}
+	Volumes []string
 }
 
 func (cfg *Config) validateBrowser() error {
@@ -54,12 +57,48 @@ func (cfg *Config) validateBrowser() error {
 	return nil
 }
 
+func (cfg *Config) validateVolumes() (err error) {
+	if len(cfg.Volumes) == 0 {
+		return errors.New("at least one volume must be configured")
+	}
+	for _, path := range cfg.Volumes {
+		fi, err := os.Stat(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return fmt.Errorf("volume path does not exist: %s", path)
+			}
+			return fmt.Errorf("could not open volume path %s: %v", path, err)
+		}
+		if !fi.IsDir() {
+			return fmt.Errorf("provided volume path is not a directory: %s", path)
+		}
+
+		f, err := ioutil.TempFile(path, ".tmp*")
+		if err != nil {
+			return fmt.Errorf("volume path is not writable: %s", path)
+		}
+		_ = f
+		if err := os.Remove(f.Name()); err != nil {
+			return err
+		}
+		if err := f.Close(); err != nil {
+			return err
+		}
+	}
+	return
+}
+
 func (cfg *Config) Validate() error {
 	if cfg.History.Enable {
 		if err := cfg.validateBrowser(); err != nil {
 			return fmt.Errorf("watch history is enabled, but browser is misconfigured:\n%v", err)
 		}
 	}
+
+	if err := cfg.validateVolumes(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -88,7 +127,7 @@ func (cmd *Command) Init(opts interface{}) error {
 		config.WithDefaults(configDefaults),
 	)
 	if err := reader.Read(&cfg); err != nil {
-		return fmt.Errorf("could not read config: %v", err)
+		return fmt.Errorf("config error: %v", err)
 	}
 
 	cmd.Config = &cfg
