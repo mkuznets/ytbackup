@@ -4,6 +4,7 @@ import argparse
 import contextlib
 import copy
 import datetime as dt
+import hashlib
 import json
 import logging
 import os
@@ -15,7 +16,7 @@ import traceback
 import typing
 from unittest import mock
 
-TEMP_ROOT = os.path.join(tempfile.gettempdir(), 'ytbackup')
+DEFAULT_TMP_ROOT = os.path.join(tempfile.gettempdir(), 'ytbackup')
 STDERR = sys.stderr
 
 
@@ -128,7 +129,7 @@ def create_logger(filename: typing.Optional[str] = None):
     return logger
 
 
-def create_hook(logger):
+def create_progress_hook(logger):
     def log_hook(data):
         logger.info(
             "%s, elapsed: %.1f, eta: %s",
@@ -167,13 +168,23 @@ class Info:
         return infos
 
 
+def urls_hash(urls: typing.List[str]) -> str:
+    h = hashlib.sha1()
+    for url in sorted(urls):
+        h.update(url.encode())
+        h.update(b'::')
+    return h.hexdigest()
+
+
 class Download:
     def __init__(self, args: argparse.Namespace):
         if not shutil.which('zip'):
             raise Error('could not find zip binary')
 
-        os.makedirs(TEMP_ROOT, exist_ok=True)
-        self.output_dir = tempfile.mkdtemp(dir=TEMP_ROOT)
+        tmp_root: str = os.path.abspath(args.tmp)
+        os.makedirs(tmp_root, exist_ok=True)
+
+        self.output_dir = os.path.join(tmp_root, f'dl_{urls_hash(args.urls)}')
 
         self.urls: typing.List[str] = args.urls
 
@@ -183,7 +194,8 @@ class Download:
         opts['outtmpl'] = os.path.join(
             self.output_dir, '%(upload_date)s_%(id)s/%(id)s.%(ext)s'
         )
-        opts['progress_hooks'] = [create_hook(logger)]
+        opts['progress_hooks'] = [create_progress_hook(logger)]
+        opts['cachedir'] = os.path.join(tmp_root, 'ydl_cache'),
 
         self.opts = opts
 
@@ -214,6 +226,11 @@ class Download:
                 continue
 
             zip_filename = video_dir + '.zip'
+            try:
+                os.remove(zip_filename)
+            except OSError:
+                pass
+
             r = sp.run(
                 ['zip', '-q', '-0', '-r', zip_filename, video_dir],
                 stdout=sp.PIPE, stderr=sp.STDOUT
@@ -221,7 +238,10 @@ class Download:
             if r.returncode:
                 raise Error(r.stdout.decode().strip())
 
-            shutil.rmtree(video_dir, ignore_errors=True)
+            try:
+                fi = os.stat(zip_filename)
+            except OSError as exc:
+                raise Error(f"could not stat zip file") from exc
 
             upload_date = dt.datetime.strptime(info['upload_date'], '%Y%m%d').date()
 
@@ -238,6 +258,7 @@ class Download:
                 'uploader': info.get('uploader', '<unknown uploader>'),
                 'upload_date': upload_date.isoformat(),
                 'file': os.path.join(self.output_dir, zip_filename),
+                'filesize': fi.st_size,
                 'info': info,
             })
 
@@ -254,6 +275,7 @@ def arg_parser():
 
     subcmd = subparsers.add_parser('download')
     subcmd.set_defaults(func=Download)
+    subcmd.add_argument('--tmp', default=DEFAULT_TMP_ROOT)
     subcmd.add_argument('--log')
     subcmd.add_argument('--preset', choices=['video', 'audio'], default='video')
     subcmd.add_argument('urls', nargs='+')
