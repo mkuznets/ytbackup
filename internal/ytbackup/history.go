@@ -2,9 +2,12 @@ package ytbackup
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"strings"
 
 	ytbrowser "mkuznets.com/go/ytbackup/internal/browser"
+	"mkuznets.com/go/ytbackup/internal/database"
 	"mkuznets.com/go/ytbackup/internal/history"
 )
 
@@ -35,9 +38,36 @@ func (cmd *HistoryCommand) Execute(args []string) error {
 		return err
 	}
 
-	for _, video := range videos {
-		fmt.Println(video.URL)
+	if err := insertMany(ctx, cmd.DB, videos[:5]); err != nil {
+		return err
 	}
 
+	return nil
+}
+
+func insertMany(ctx context.Context, db *sql.DB, values []*history.Video) error {
+	var q strings.Builder
+	vals := make([]interface{}, len(values))
+
+	q.WriteString(`INSERT INTO videos (video_id) VALUES `)
+
+	last := len(values) - 1
+	for i, v := range values {
+		q.WriteString(`(?)`)
+		if i < last {
+			q.WriteString(",")
+		}
+		vals[i] = v.ID
+	}
+	q.WriteString(" ON CONFLICT (video_id) DO NOTHING;")
+
+	err := database.InTx(ctx, db, func(tx *sql.Tx) error {
+		_, err := tx.Exec(q.String(), vals...)
+		return err
+	})
+
+	if err != nil {
+		return fmt.Errorf("transaction error: %v", err)
+	}
 	return nil
 }
