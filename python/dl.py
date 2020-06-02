@@ -141,6 +141,16 @@ def create_progress_hook(logger):
     return log_hook
 
 
+def sha256sum(filename):
+    h = hashlib.sha256()
+    b = bytearray(128 * 1024)
+    mv = memoryview(b)
+    with open(filename, 'rb', buffering=0) as f:
+        for n in iter(lambda: f.readinto(mv), 0):
+            h.update(mv[:n])
+    return f"sha256:{h.hexdigest()}"
+
+
 # ------------------------------------------------------------------------------
 
 
@@ -182,9 +192,9 @@ class Download:
             raise Error('could not find zip binary')
 
         tmp_root: str = os.path.abspath(args.tmp)
-        os.makedirs(tmp_root, exist_ok=True)
 
         self.output_dir = os.path.join(tmp_root, f'dl_{urls_hash(args.urls)}')
+        os.makedirs(self.output_dir, exist_ok=True)
 
         self.urls: typing.List[str] = args.urls
 
@@ -243,6 +253,9 @@ class Download:
             except OSError as exc:
                 raise Error(f"could not stat zip file") from exc
 
+            filesize = fi.st_size
+            filehash = sha256sum(zip_filename)
+
             upload_date = dt.datetime.strptime(info['upload_date'], '%Y%m%d').date()
 
             redundant_keys = (
@@ -258,7 +271,8 @@ class Download:
                 'uploader': info.get('uploader', '<unknown uploader>'),
                 'upload_date': upload_date.isoformat(),
                 'file': os.path.join(self.output_dir, zip_filename),
-                'filesize': fi.st_size,
+                'filesize': filesize,
+                'filehash': filehash,
                 'info': info,
             })
 
