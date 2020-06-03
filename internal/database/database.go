@@ -16,7 +16,7 @@ import (
 const currentVersion = 1
 
 func New() (*sql.DB, error) {
-	dsn := "sqlite3://ytbackup.db"
+	dsn := "sqlite3://ytbackup.db?_journal_mode=WAL&_synchronous=normal"
 
 	sqlFS, err := fs.NewWithNamespace(sqlfs.Sql)
 	if err != nil {
@@ -39,6 +39,7 @@ func New() (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not open database: %v", err)
 	}
+	db.SetMaxOpenConns(1)
 
 	return db, nil
 }
