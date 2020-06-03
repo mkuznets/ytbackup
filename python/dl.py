@@ -205,7 +205,7 @@ class Download:
             self.output_dir, '%(upload_date)s_%(id)s/%(id)s.%(ext)s'
         )
         opts['progress_hooks'] = [create_progress_hook(logger)]
-        opts['cachedir'] = os.path.join(tmp_root, 'ydl_cache'),
+        opts['cachedir'] = os.path.join(tmp_root, 'ydl_cache')
 
         self.opts = opts
 
