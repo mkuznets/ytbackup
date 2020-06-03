@@ -1,1 +1,1 @@
-DROP TABLE IF EXISTS ytbackup;
+DROP TABLE IF EXISTS videos;
