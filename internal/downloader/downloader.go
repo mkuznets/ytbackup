@@ -181,6 +181,11 @@ func (dl *Downloader) processVideo(ctx context.Context, tx *sql.Tx, videoID stri
 		if err != nil {
 			return fmt.Errorf("insert error: %v", err)
 		}
+
+		if err := os.RemoveAll(filepath.Dir(res.File)); err != nil {
+			log.Printf("[WARN] could not remove tmp files: %v", err)
+			return nil
+		}
 	}
 
 	return nil
