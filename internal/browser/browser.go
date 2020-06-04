@@ -107,7 +107,7 @@ func (b *Browser) DebugURL(ctx context.Context) (string, error) {
 }
 
 func (b *Browser) Do(ctx context.Context, f func(ctx context.Context, url string) error) error {
-	var wg sync.WaitGroup
+	wg := &sync.WaitGroup{}
 	defer wg.Wait()
 
 	ctx, cancel := context.WithCancel(ctx)

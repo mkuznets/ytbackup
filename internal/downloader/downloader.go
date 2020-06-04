@@ -18,7 +18,10 @@ import (
 	"mkuznets.com/go/ytbackup/internal/volumes"
 )
 
-const maxAttempts = 3
+const (
+	maxAttempts      = 3
+	ytVideoURLFormat = "https://www.youtube.com/watch?v=%s"
+)
 
 type Downloader struct {
 	venv    *venv.VirtualEnv
@@ -63,7 +66,7 @@ func (dl *Downloader) Download(ctx context.Context, videoID string) ([]*Download
 	rctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
-	url := fmt.Sprintf("https://www.youtube.com/watch?v=%s", videoID)
+	url := fmt.Sprintf(ytVideoURLFormat, videoID)
 
 	cargs := []string{"/dl.py", "download", "--log=/tmp/ytbackup/dl.log", url}
 
