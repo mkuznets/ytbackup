@@ -3,7 +3,6 @@ package downloader
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -51,18 +50,7 @@ func New(vs *volumes.Volumes) (*Downloader, error) {
 	return dl, nil
 }
 
-type DownloadResult struct {
-	ID         string
-	Title      string
-	Uploader   string
-	UploadDate ISODate `json:"upload_date"`
-	File       string
-	FileSize   int    `json:"filesize"`
-	FileHash   string `json:"filehash"`
-	Info       json.RawMessage
-}
-
-func (dl *Downloader) Download(ctx context.Context, videoID string) ([]*DownloadResult, error) {
+func (dl *Downloader) Download(ctx context.Context, videoID string) ([]*Result, error) {
 	rctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
@@ -70,7 +58,7 @@ func (dl *Downloader) Download(ctx context.Context, videoID string) ([]*Download
 
 	cargs := []string{"/dl.py", "download", "--log=/tmp/ytbackup/dl.log", url}
 
-	var result []*DownloadResult
+	var result []*Result
 
 	if err := dl.venv.RunScript(rctx, &result, cargs...); err != nil {
 		return nil, err
@@ -150,13 +138,9 @@ func (dl *Downloader) processVideo(ctx context.Context, tx *sql.Tx, videoID stri
 	}
 
 	for _, res := range results {
-		dst := filepath.Join(
-			res.UploadDate.Format("2006"),
-			res.UploadDate.Format("01"),
-			filepath.Base(res.File),
-		)
+		storagePath := res.StoragePath()
 
-		vol, err := dl.volumes.Put(res.File, dst)
+		vol, err := dl.volumes.Put(res.File, storagePath)
 		if err != nil {
 			return err
 		}
@@ -177,13 +161,13 @@ func (dl *Downloader) processVideo(ctx context.Context, tx *sql.Tx, videoID stri
 						filesize=excluded.filesize,
 						filehash=excluded.filehash
 					WHERE videos.status != 'DOWNLOADED';
-					`, res.ID, res.Title, res.Uploader, res.UploadDate, res.Info, vol, dst, res.FileSize, res.FileHash)
+					`, res.ID, res.Title, res.Uploader, res.UploadDate, res.Info, vol, storagePath, res.FileSize, res.FileHash)
 		if err != nil {
 			return fmt.Errorf("insert error: %v", err)
 		}
 
-		if err := os.RemoveAll(filepath.Dir(res.File)); err != nil {
-			log.Printf("[WARN] could not remove tmp files: %v", err)
+		if err := res.Cleanup(); err != nil {
+			log.Printf("[WARN] Could not remove temporary files: %v", err)
 			return nil
 		}
 	}
