@@ -10,7 +10,7 @@ import (
 
 // Options is a group of common options for all subcommands.
 type Options struct {
-	ConfigPath string `short:"c" long:"config" description:"custom config path"`
+	ConfigPath string `short:"c" long:"config" description:"custom config path" env:"YTBACKUP_CONFIG"`
 }
 
 // Command is a common part of all subcommands.

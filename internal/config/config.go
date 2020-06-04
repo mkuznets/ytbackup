@@ -72,7 +72,7 @@ func (r *Reader) yamlOptions() ([]config.YAMLOption, error) {
 
 	content, err := ioutil.ReadFile(altPath)
 	if err == nil {
-		log.Printf("using config file: %v", altPath)
+		log.Printf("[DEBUG] config file found: %v", altPath)
 		options = append(options, config.Source(bytes.NewBuffer(content)))
 	}
 
@@ -82,7 +82,7 @@ func (r *Reader) yamlOptions() ([]config.YAMLOption, error) {
 		if err != nil {
 			return nil, err
 		}
-		log.Printf("using config file: %v", absPath)
+		log.Printf("[DEBUG] config file found: %v", absPath)
 		options = append(options, config.File(absPath))
 	}
 

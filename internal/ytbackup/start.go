@@ -15,6 +15,7 @@ import (
 )
 
 type StartCommand struct {
+	DisableDownload bool `long:"disable-download" description:"do not download new videos" env:"YTBACKUP_DISABLE_DOWNLOAD"`
 	Command
 }
 
@@ -49,10 +50,16 @@ func (cmd *StartCommand) Execute([]string) error {
 		}()
 	}
 
-	if err := dl.Serve(ctx, cmd.DB); err != nil {
-		return err
+	if !cmd.DisableDownload {
+		log.Printf("[INFO] Starting downloader")
+		if err := dl.Serve(ctx, cmd.DB); err != nil {
+			return err
+		}
+		return nil
 	}
 
+	log.Printf("[INFO] Downloader is disabled")
+	<-ctx.Done()
 	return nil
 }
 
