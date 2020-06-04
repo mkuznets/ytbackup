@@ -21,7 +21,7 @@ type StartCommand struct {
 func (cmd *StartCommand) Execute([]string) error {
 	ctx := context.Background()
 
-	vs, err := cmd.Config.Volumes.New()
+	vs, err := cmd.Config.Destinations.New()
 	if err != nil {
 		return err
 	}
@@ -31,7 +31,7 @@ func (cmd *StartCommand) Execute([]string) error {
 		return err
 	}
 
-	if cmd.Config.Targets.History {
+	if cmd.Config.Sources.History {
 		go func() {
 			log.Printf("[INFO] Starting watch history crawler")
 			if err := cmd.crawlHistory(ctx); err != nil {
@@ -40,7 +40,7 @@ func (cmd *StartCommand) Execute([]string) error {
 		}()
 	}
 
-	if len(cmd.Config.Targets.Playlists) > 0 {
+	if len(cmd.Config.Sources.Playlists) > 0 {
 		go func() {
 			log.Printf("[INFO] Starting playlists crawler")
 			if err := cmd.crawlAPI(ctx); err != nil {
@@ -56,19 +56,32 @@ func (cmd *StartCommand) Execute([]string) error {
 	return nil
 }
 
-func (cmd *StartCommand) crawlAPI(ctx context.Context) error {
-	token := cmd.Config.Youtube.Credentials.Token()
+func (cmd *StartCommand) createYoutubeService(ctx context.Context) (*youtube.Service, error) {
+	token := cmd.Config.Youtube.OAuth.Token()
 	tokenSource := yt.NewConfig().TokenSource(ctx, token)
 
-	service, err := youtube.NewService(ctx, option.WithTokenSource(tokenSource))
-	if err != nil {
-		return fmt.Errorf("could not create youtube client: %v", err)
+	ytopts := []option.ClientOption{
+		option.WithTokenSource(tokenSource),
 	}
 
+	service, err := youtube.NewService(ctx, ytopts...)
+	if err != nil {
+		return nil, fmt.Errorf("could not create youtube client: %v", err)
+	}
+
+	return service, nil
+}
+
+func (cmd *StartCommand) crawlAPI(ctx context.Context) error {
 	videos := make([]string, 0, 50)
 
+	service, err := cmd.createYoutubeService(ctx)
+	if err != nil {
+		return err
+	}
+
 	runEveryInterval(ctx, cmd.Config.UpdateInterval, func() {
-		for _, playlistID := range cmd.Config.Targets.Playlists {
+		for title, playlistID := range cmd.Config.Sources.Playlists {
 			total := 0
 
 			call := service.PlaylistItems.List("contentDetails")
@@ -89,7 +102,7 @@ func (cmd *StartCommand) crawlAPI(ctx context.Context) error {
 
 				n, err := database.InsertMany(ctx, cmd.DB, videos)
 				if err != nil {
-					log.Printf("[ERR] Playlist %s: %v", playlistID, err)
+					log.Printf("[ERR] Playlist `%s`: %v", title, err)
 					break
 				}
 
@@ -103,7 +116,7 @@ func (cmd *StartCommand) crawlAPI(ctx context.Context) error {
 				}
 				call.PageToken(response.NextPageToken)
 			}
-			log.Printf("[INFO] Scheduled %d new videos from playlist %s", total, playlistID)
+			log.Printf("[INFO] Scheduled %d new videos from playlist `%s`", total, title)
 		}
 	})
 

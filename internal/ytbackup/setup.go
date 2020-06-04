@@ -31,10 +31,10 @@ func (cmd *SetupCommand) Execute([]string) error {
 func printCreds(token *oauth2.Token) error {
 	cfg := struct {
 		Youtube struct {
-			Credentials *Credentials
+			OAuth *OAuth
 		}
 	}{}
-	cfg.Youtube.Credentials = NewCredentials(token)
+	cfg.Youtube.OAuth = NewCredentials(token)
 
 	m, err := yaml.Marshal(cfg)
 	if err != nil {

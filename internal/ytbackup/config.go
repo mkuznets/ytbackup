@@ -24,19 +24,19 @@ update_interval: 5m
 `
 
 type Config struct {
-	Targets struct {
+	Sources struct {
 		History   bool
-		Playlists []string
+		Playlists map[string]string
 	}
-	Youtube struct {
-		Credentials Credentials
+	Destinations Volumes
+	Youtube      struct {
+		OAuth OAuth `yaml:"oauth"`
 	}
 	UpdateInterval time.Duration `yaml:"update_interval"`
 	Python         struct {
 		Executable string `yaml:"executable"`
 	}
 	Browser Browser
-	Volumes Volumes
 }
 
 type Volumes []string
@@ -56,14 +56,14 @@ func (bcfg *Browser) New() (*browser.Browser, error) {
 	return browser.New(bcfg.Executable, bcfg.DataDir, bcfg.DebugPort, bcfg.ExtraArgs)
 }
 
-type Credentials struct {
+type OAuth struct {
 	AccessToken  string    `json:"access_token" yaml:"access_token"`
 	TokenType    string    `json:"token_type,omitempty" yaml:"token_type,omitempty"`
 	RefreshToken string    `json:"refresh_token,omitempty" yaml:"refresh_token,omitempty"`
 	Expiry       time.Time `json:"expiry,omitempty" yaml:"expiry,omitempty"`
 }
 
-func (cr *Credentials) Token() *oauth2.Token {
+func (cr *OAuth) Token() *oauth2.Token {
 	return &oauth2.Token{
 		AccessToken:  obscure.MustReveal(cr.AccessToken),
 		TokenType:    cr.TokenType,
@@ -72,8 +72,8 @@ func (cr *Credentials) Token() *oauth2.Token {
 	}
 }
 
-func NewCredentials(token *oauth2.Token) *Credentials {
-	return &Credentials{
+func NewCredentials(token *oauth2.Token) *OAuth {
+	return &OAuth{
 		AccessToken:  obscure.MustObscure(token.AccessToken),
 		TokenType:    token.TokenType,
 		RefreshToken: obscure.MustObscure(token.RefreshToken),
@@ -82,16 +82,27 @@ func NewCredentials(token *oauth2.Token) *Credentials {
 }
 
 func (cfg *Config) Validate() error {
-	if cfg.Targets.History {
+	if cfg.Sources.History {
 		if err := cfg.validateBrowser(); err != nil {
 			return fmt.Errorf("watch history is enabled, but browser is misconfigured:\n%v", err)
 		}
 	}
-
-	if err := cfg.validateVolumes(); err != nil {
+	if len(cfg.Sources.Playlists) > 0 {
+		if err := cfg.validateYoutube(); err != nil {
+			return fmt.Errorf("playlists are enabled, but youtube config is invalid:\n%v", err)
+		}
+	}
+	if err := cfg.validateDestinations(); err != nil {
 		return err
 	}
+	return nil
+}
 
+func (cfg *Config) validateYoutube() error {
+	oauth := cfg.Youtube.OAuth
+	if oauth.AccessToken == "" || oauth.RefreshToken == "" || oauth.TokenType == "" {
+		return errors.New("oauth.{access_token, token_type, refresh_token} are required with `method: oauth`")
+	}
 	return nil
 }
 
@@ -116,32 +127,32 @@ func (cfg *Config) validateBrowser() error {
 	return nil
 }
 
-func (cfg *Config) validateVolumes() (err error) {
-	if len(cfg.Volumes) == 0 {
-		return errors.New("at least one volume must be configured")
+func (cfg *Config) validateDestinations() (err error) {
+	if len(cfg.Destinations) == 0 {
+		return errors.New("at least one destination directory must be configured")
 	}
 
-	for i := range cfg.Volumes {
-		path, err := homedir.Expand(cfg.Volumes[i])
+	for i := range cfg.Destinations {
+		path, err := homedir.Expand(cfg.Destinations[i])
 		if err != nil {
-			return fmt.Errorf("could not expand volume path: %v", err)
+			return fmt.Errorf("could not expand destination path: %v", err)
 		}
-		cfg.Volumes[i] = path
+		cfg.Destinations[i] = path
 
 		fi, err := os.Stat(path)
 		if err != nil {
 			if os.IsNotExist(err) {
-				return fmt.Errorf("volume path does not exist: %s", path)
+				return fmt.Errorf("destination path does not exist: %s", path)
 			}
-			return fmt.Errorf("could not open volume path %s: %v", path, err)
+			return fmt.Errorf("could not open destination path %s: %v", path, err)
 		}
 		if !fi.IsDir() {
-			return fmt.Errorf("provided volume path is not a directory: %s", path)
+			return fmt.Errorf("provided destination path is not a directory: %s", path)
 		}
 
 		f, err := ioutil.TempFile(path, ".tmp*")
 		if err != nil {
-			return fmt.Errorf("volume path is not writable: %s", path)
+			return fmt.Errorf("destination path is not writable: %s", path)
 		}
 		_ = f
 		if err := os.Remove(f.Name()); err != nil {

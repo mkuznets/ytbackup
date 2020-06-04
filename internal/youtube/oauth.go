@@ -63,6 +63,8 @@ func NewToken(ctx context.Context, config *oauth2.Config) (*oauth2.Token, error)
 		go stopServer(ctx, srv)
 	}()
 
+	// TODO: support manual code entry for remote setups
+	// https://developers.google.com/identity/protocols/oauth2/native-app#manual-copypaste
 	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
 	go openURL(authURL)
 
