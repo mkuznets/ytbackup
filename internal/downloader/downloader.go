@@ -17,6 +17,7 @@ import (
 )
 
 const (
+	networkDowntime  = time.Minute
 	ytVideoURLFormat = "https://www.youtube.com/watch?v=%s"
 )
 
@@ -54,7 +55,7 @@ func (dl *Downloader) Download(ctx context.Context, videoID string) ([]*Result, 
 
 	url := fmt.Sprintf(ytVideoURLFormat, videoID)
 
-	cargs := []string{"/dl.py", "download", "--log=/tmp/ytbackup/dl.log", url}
+	cargs := []string{"/dl.py", "--log=/tmp/ytbackup/dl.log", "download", url}
 
 	var result []*Result
 
@@ -76,10 +77,9 @@ func (dl *Downloader) Serve(ctx context.Context, db *index.Index) error {
 			}
 
 			found := len(videos) > 0
-			putBack := make([]string, 0)
 
 			for _, video := range videos {
-				log.Printf("[INFO] Found %s", video.ID)
+				log.Printf("[INFO] Downloading %s", video.ID)
 
 				if err := downloadLimiter.Wait(ctx); err != nil {
 					return fmt.Errorf("limiter wait: %v", err)
@@ -87,8 +87,16 @@ func (dl *Downloader) Serve(ctx context.Context, db *index.Index) error {
 
 				results, err := dl.Download(ctx, video.ID)
 				if err != nil {
+					if e, ok := err.(*venv.ScriptError); ok && e.Reason == "network" {
+						_ = db.Retry(video.ID, index.RetryInfinite)
+
+						log.Printf("[WARN] Network is down, sleeping for %s", networkDowntime)
+						time.Sleep(networkDowntime)
+						continue
+					}
+
 					log.Printf("[ERR] Could not download %s: %v", video.ID, err)
-					putBack = append(putBack, video.ID)
+					_ = db.Retry(video.ID, index.RetryLimited)
 					continue
 				}
 
@@ -119,15 +127,8 @@ func (dl *Downloader) Serve(ctx context.Context, db *index.Index) error {
 					}()
 
 					if err != nil {
-						putBack = append(putBack, res.ID)
-						log.Printf("[ERR] %v", err)
+						_ = db.Retry(video.ID, index.RetryLimited)
 					}
-				}
-			}
-
-			for _, id := range putBack {
-				if err := db.PutBack(id); err != nil {
-					log.Printf("[ERR] %v", err)
 				}
 			}
 

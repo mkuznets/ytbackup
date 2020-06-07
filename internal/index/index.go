@@ -22,6 +22,13 @@ var (
 	allBuckets       = [4][]byte{bucketNew, bucketInProgress, bucketDone, bucketFailed}
 )
 
+type RetryMode uint8
+
+const (
+	RetryInfinite RetryMode = 1 + iota
+	RetryLimited
+)
+
 type Index struct {
 	path               string
 	db                 *bolt.DB
@@ -162,7 +169,7 @@ func (st *Index) Pop(n int) ([]*Video, error) {
 	return items, nil
 }
 
-func (st *Index) PutBack(id string) error {
+func (st *Index) Retry(id string, mode RetryMode) error {
 	log.Printf("[INFO] Putting %s back to %s", id, bucketNew)
 
 	return st.db.Update(func(tx *bolt.Tx) error {
@@ -176,7 +183,11 @@ func (st *Index) PutBack(id string) error {
 		if err := json.Unmarshal(value, &video); err != nil {
 			return err
 		}
-		video.Attempt++
+
+		if mode == RetryLimited {
+			video.Attempt++
+		}
+
 		after := time.Now().Add(retryDelay)
 		video.RetryAfter = &after
 
@@ -260,7 +271,6 @@ func (st *Index) ensureTimeoutOnce() error {
 				log.Printf("[WARN] %s timed out, putting it back to %s", key, bucketNew)
 
 				video.Deadline = nil
-				video.Attempt++
 
 				if err := put(tx, bucketNew, &video); err != nil {
 					return err

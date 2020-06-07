@@ -12,7 +12,7 @@ const knownErrorCode = 0xE7
 
 type ScriptError struct {
 	ErrorText string `json:"error"`
-	Traceback string `json:"traceback"`
+	Reason    string `json:"reason"`
 }
 
 func (se *ScriptError) Error() string {
@@ -36,16 +36,18 @@ func (v *VirtualEnv) RunScript(ctx context.Context, result interface{}, args ...
 	out, err := v.run(ctx, f, v.python, cargs...)
 
 	if err != nil {
-		e, ok := err.(*exec.ExitError)
-		if ok && e.ExitCode() == knownErrorCode {
-			var serr ScriptError
-			if e := json.Unmarshal(e.Stderr, &serr); e != nil {
-				return fmt.Errorf("could not decode script error: %v", e)
-			}
-			return &serr
-		}
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return fmt.Errorf("timeout exceeded")
+		}
+		if e, ok := err.(*exec.ExitError); ok {
+			if e.ExitCode() == knownErrorCode {
+				var serr ScriptError
+				if e := json.Unmarshal(out, &serr); e != nil {
+					return fmt.Errorf("could not decode script error: %v", e)
+				}
+				return &serr
+			}
+			return fmt.Errorf("%s\n%s", e.Error(), out)
 		}
 		return err
 	}

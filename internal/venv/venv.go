@@ -91,7 +91,7 @@ func (v *VirtualEnv) run(ctx context.Context, input io.Reader, name string, args
 	if input != nil {
 		c.Stdin = input
 	}
-	return c.Output()
+	return c.CombinedOutput()
 }
 
 func (v *VirtualEnv) upgrade(ctx context.Context) error {

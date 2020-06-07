@@ -5,16 +5,20 @@ import contextlib
 import copy
 import datetime as dt
 import hashlib
+import http.client
 import json
 import logging
 import os
 import shutil
+import socket
 import subprocess as sp
 import sys
 import tempfile
-import traceback
 import typing
+import urllib.error
 from unittest import mock
+
+NETWORK_EXCS = (urllib.error.URLError, http.client.HTTPException, socket.error)
 
 DEFAULT_TMP_ROOT = os.path.join(tempfile.gettempdir(), 'ytbackup')
 STDERR = sys.stderr
@@ -89,7 +93,10 @@ class Preset:
 
 
 class Error(Exception):
-    pass
+
+    def __init__(self, *args, reason=None, **kwargs):
+        self.reason = reason or 'unknown'
+        super().__init__(*args, **kwargs)
 
 
 def json_dump(data, f: typing.TextIO):
@@ -110,21 +117,22 @@ def suppress_output():
             yield
 
 
-def create_logger(filename: typing.Optional[str] = None):
+def get_logger(filename: typing.Optional[str] = None):
     logger = logging.getLogger("log")
     logger.setLevel(logging.DEBUG)
 
-    stream = STDERR
-    if filename:
-        stream = open(filename, 'a+')
+    if not logger.handlers:
+        stream = STDERR
+        if filename:
+            stream = open(filename, 'a+')
 
-    handler = logging.StreamHandler(stream)
+        handler = logging.StreamHandler(stream)
 
-    fmt = logging.Formatter('%(asctime)s\t%(levelname)s\t%(message)s')
-    handler.setFormatter(fmt)
-    handler.setLevel(logging.DEBUG)
+        fmt = logging.Formatter('%(asctime)s\t%(levelname)s\t%(message)s')
+        handler.setFormatter(fmt)
+        handler.setLevel(logging.DEBUG)
 
-    logger.addHandler(handler)
+        logger.addHandler(handler)
 
     return logger
 
@@ -198,13 +206,13 @@ class Download:
 
         self.urls: typing.List[str] = args.urls
 
-        logger = create_logger(args.log or None)
+        self.logger = get_logger(args.log)
 
-        opts: dict = getattr(Preset(logger=logger), args.preset)
+        opts: dict = getattr(Preset(logger=self.logger), args.preset)
         opts['outtmpl'] = os.path.join(
             self.output_dir, '%(upload_date)s_%(id)s/%(id)s.%(ext)s'
         )
-        opts['progress_hooks'] = [create_progress_hook(logger)]
+        opts['progress_hooks'] = [create_progress_hook(self.logger)]
         opts['cachedir'] = os.path.join(tmp_root, 'ydl_cache')
 
         self.opts = opts
@@ -223,8 +231,13 @@ class Download:
             infos[data['id']] = data
             return process_info(data)
 
-        with mock.patch.object(ydl, 'process_info', process_hook):
-            ydl.download(self.urls)
+        try:
+            with mock.patch.object(ydl, 'process_info', process_hook):
+                ydl.download(self.urls)
+        except youtube_dl.DownloadError as exc:
+            if exc.exc_info[0] in NETWORK_EXCS:
+                raise Error('network unavailable', reason='network') from exc
+            raise
 
         os.chdir(self.output_dir)
 
@@ -251,7 +264,7 @@ class Download:
             try:
                 fi = os.stat(zip_filename)
             except OSError as exc:
-                raise Error(f"could not stat zip file") from exc
+                raise Error(f'could not stat zip file') from exc
 
             filesize = fi.st_size
             filehash = sha256sum(zip_filename)
@@ -281,6 +294,8 @@ class Download:
 
 def arg_parser():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--log')
+
     subparsers = parser.add_subparsers(dest='command', required=True)
 
     subcmd = subparsers.add_parser('info')
@@ -290,7 +305,6 @@ def arg_parser():
     subcmd = subparsers.add_parser('download')
     subcmd.set_defaults(func=Download)
     subcmd.add_argument('--tmp', default=DEFAULT_TMP_ROOT)
-    subcmd.add_argument('--log')
     subcmd.add_argument('--preset', choices=['video', 'audio'], default='video')
     subcmd.add_argument('urls', nargs='+')
 
@@ -299,16 +313,27 @@ def arg_parser():
 
 def main():
     args = arg_parser().parse_args()
+    logger = get_logger(args.log)
+
     try:
         with suppress_output():
             result = args.func(args).execute()
         json_dump(result, sys.stdout)
 
     except Exception as exc:
+        if isinstance(exc, Error):
+            msg = str(exc)
+            reason = exc.reason
+        else:
+            logger.exception("unknown error")
+            msg = f'{exc.__class__.__name__}: {str(exc)}'
+            reason = 'unknown'
+
         json_dump({
-            'error': f'{exc.__class__.__name__}: {str(exc)}',
-            'traceback': traceback.format_exc(),
+            'error': msg,
+            'reason': reason,
         }, sys.stderr)
+
         sys.exit(0xE7)
 
 
