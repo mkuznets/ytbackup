@@ -62,14 +62,14 @@ func (b *Browser) Run(ctx context.Context) error {
 	ctxTimeout, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	log.Printf("running: %s %s", b.executable, strings.Join(b.execArgs, " "))
+	log.Printf("[DEBUG] running: %s %s", b.executable, strings.Join(b.execArgs, " "))
 
 	execCmd := exec.CommandContext(ctxTimeout, b.executable, b.execArgs...)
 	if err := execCmd.Run(); err != nil {
 		if errors.Is(ctxTimeout.Err(), context.Canceled) {
 			return nil
 		}
-		log.Printf("browser error: %v", err)
+		log.Printf("[ERR] browser error: %v", err)
 		return err
 	}
 	return nil

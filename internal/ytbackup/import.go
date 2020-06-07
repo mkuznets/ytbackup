@@ -1,14 +1,12 @@
 package ytbackup
 
 import (
-	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/url"
 
 	"github.com/mitchellh/go-homedir"
-	"mkuznets.com/go/ytbackup/internal/database"
 	"mkuznets.com/go/ytbackup/internal/utils"
 )
 
@@ -55,7 +53,7 @@ func (cmd *ImportCommand) Execute([]string) error {
 		return fmt.Errorf("import error: %v", err)
 	}
 
-	n, err := database.InsertMany(context.Background(), cmd.DB, ids)
+	n, err := cmd.Index.Push(ids)
 	if err != nil {
 		return err
 	}

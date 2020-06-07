@@ -8,7 +8,6 @@ import (
 
 	"google.golang.org/api/option"
 	"google.golang.org/api/youtube/v3"
-	"mkuznets.com/go/ytbackup/internal/database"
 	"mkuznets.com/go/ytbackup/internal/downloader"
 	"mkuznets.com/go/ytbackup/internal/history"
 	yt "mkuznets.com/go/ytbackup/internal/youtube"
@@ -52,7 +51,7 @@ func (cmd *StartCommand) Execute([]string) error {
 
 	if !cmd.DisableDownload {
 		log.Printf("[INFO] Starting downloader")
-		if err := dl.Serve(ctx, cmd.DB); err != nil {
+		if err := dl.Serve(ctx, cmd.Index); err != nil {
 			return err
 		}
 		return nil
@@ -98,7 +97,7 @@ func (cmd *StartCommand) crawlAPI(ctx context.Context) error {
 			for {
 				response, err := call.Do()
 				if err != nil {
-					log.Printf("youtube api error: %v", err)
+					log.Printf("[ERR] Youtube API: %v", err)
 					break
 				}
 
@@ -107,10 +106,9 @@ func (cmd *StartCommand) crawlAPI(ctx context.Context) error {
 					videos = append(videos, x.ContentDetails.VideoId)
 				}
 
-				n, err := database.InsertMany(ctx, cmd.DB, videos)
+				n, err := cmd.Index.Push(videos)
 				if err != nil {
 					log.Printf("[ERR] Playlist `%s`: %v", title, err)
-					break
 				}
 
 				total += n
@@ -145,10 +143,11 @@ func (cmd *StartCommand) crawlHistory(ctx context.Context) error {
 				return err
 			}
 
-			n, err := database.InsertMany(ctx, cmd.DB, videos)
+			n, err := cmd.Index.Push(videos)
 			if err != nil {
 				return err
 			}
+
 			log.Printf("[INFO] Scheduled %d new videos from watch history", n)
 
 			return nil
