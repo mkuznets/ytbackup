@@ -259,7 +259,7 @@ class Download:
             upload_date = dt.datetime.strptime(info['upload_date'], '%Y%m%d').date()
 
             redundant_keys = (
-                'formats', 'requested_formats', 'format', 'format_id',
+                'formats', 'requested_formats', 'format', 'format_id', 'requested_subtitles',
                 *(k for k in info if str(k).startswith('_')),
             )
             for key in redundant_keys:
