@@ -16,6 +16,7 @@ import (
 // Options is a group of common options for all subcommands.
 type Options struct {
 	ConfigPath string `short:"c" long:"config" description:"custom config path" env:"YTBACKUP_CONFIG"`
+	Debug      bool   `long:"debug" description:"enable debug logging" env:"YTBACKUP_DEBUG"`
 }
 
 // Command is a common part of all subcommands.
@@ -30,12 +31,17 @@ func (cmd *Command) Init(opts interface{}) error {
 		Out:        os.Stderr,
 		TimeFormat: "2006-01-02 15:04:05",
 	})
-	zerolog.SetGlobalLevel(zerolog.DebugLevel)
 
 	options, ok := opts.(*Options)
 	if !ok {
 		panic("type mismatch")
 	}
+
+	lvl := zerolog.InfoLevel
+	if options.Debug {
+		lvl = zerolog.DebugLevel
+	}
+	zerolog.SetGlobalLevel(lvl)
 
 	var cfg Config
 

@@ -34,7 +34,7 @@ func (cmd *StartCommand) Execute([]string) error {
 
 	if cmd.Config.Sources.History {
 		go func() {
-			log.Debug().
+			log.Info().
 				Stringer("interval", cmd.Config.UpdateInterval).
 				Msg("Watch history crawler: starting")
 
@@ -46,7 +46,7 @@ func (cmd *StartCommand) Execute([]string) error {
 
 	if len(cmd.Config.Sources.Playlists) > 0 {
 		go func() {
-			log.Debug().
+			log.Info().
 				Stringer("interval", cmd.Config.UpdateInterval).
 				Msg("Playlists crawler: starting")
 
