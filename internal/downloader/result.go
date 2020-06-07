@@ -2,9 +2,10 @@ package downloader
 
 import (
 	"encoding/json"
-	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/rs/zerolog/log"
 )
 
 type Result struct {
@@ -20,7 +21,7 @@ type Result struct {
 
 func (dr *Result) Cleanup() error {
 	dir := filepath.Dir(dr.File)
-	log.Printf("[DEBUG] Cleaning up temporary files for %s: %s", dr.ID, dir)
+	log.Debug().Str("id", dr.ID).Str("path", dir).Msg("Cleaning up temporary files")
 	return os.RemoveAll(dir)
 }
 

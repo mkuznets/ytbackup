@@ -3,10 +3,11 @@ package downloader
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/rakyll/statik/fs"
 	"golang.org/x/time/rate"
@@ -79,7 +80,7 @@ func (dl *Downloader) Serve(ctx context.Context, db *index.Index) error {
 			found := len(videos) > 0
 
 			for _, video := range videos {
-				log.Printf("[INFO] Downloading %s", video.ID)
+				log.Info().Str("id", video.ID).Msg("Downloading")
 
 				if err := downloadLimiter.Wait(ctx); err != nil {
 					return fmt.Errorf("limiter wait: %v", err)
@@ -90,12 +91,12 @@ func (dl *Downloader) Serve(ctx context.Context, db *index.Index) error {
 					if e, ok := err.(*venv.ScriptError); ok && e.Reason == "network" {
 						_ = db.Retry(video.ID, index.RetryInfinite)
 
-						log.Printf("[WARN] Network is down, sleeping for %s", networkDowntime)
+						log.Warn().Msgf("Network is down, sleeping for %s", networkDowntime)
 						time.Sleep(networkDowntime)
 						continue
 					}
 
-					log.Printf("[ERR] Could not download %s: %v", video.ID, err)
+					log.Err(err).Str("id", video.ID).Msg("Could not download")
 					_ = db.Retry(video.ID, index.RetryLimited)
 					continue
 				}

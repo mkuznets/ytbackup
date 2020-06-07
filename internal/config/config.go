@@ -3,10 +3,11 @@ package config
 import (
 	"bytes"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/mitchellh/go-homedir"
 	"go.uber.org/config"
@@ -72,7 +73,7 @@ func (r *Reader) yamlOptions() ([]config.YAMLOption, error) {
 
 	content, err := ioutil.ReadFile(altPath)
 	if err == nil {
-		log.Printf("[DEBUG] config file found: %v", altPath)
+		log.Debug().Str("path", altPath).Msg("Config file found")
 		options = append(options, config.Source(bytes.NewBuffer(content)))
 	}
 
@@ -82,7 +83,7 @@ func (r *Reader) yamlOptions() ([]config.YAMLOption, error) {
 		if err != nil {
 			return nil, err
 		}
-		log.Printf("[DEBUG] config file found: %v", absPath)
+		log.Debug().Str("path", absPath).Msg("Config file found")
 		options = append(options, config.File(absPath))
 	}
 

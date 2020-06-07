@@ -4,10 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"syscall"
+
+	"github.com/rs/zerolog/log"
 )
 
 type Volumes struct {
@@ -55,7 +56,12 @@ func (vs *Volumes) Put(src, dst string) (string, error) {
 		}
 
 		freeSpace := st.Bavail * uint64(st.Bsize)
-		log.Printf("free: %v, required: %v", freeSpace, targetSize)
+
+		log.Debug().
+			Str("key", key).
+			Uint64("free", freeSpace).
+			Uint64("required", targetSize).
+			Msg("Storage info")
 
 		if freeSpace < targetSize {
 			continue

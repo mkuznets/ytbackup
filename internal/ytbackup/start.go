@@ -3,8 +3,9 @@ package ytbackup
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
+
+	"github.com/rs/zerolog/log"
 
 	"google.golang.org/api/option"
 	"google.golang.org/api/youtube/v3"
@@ -33,31 +34,37 @@ func (cmd *StartCommand) Execute([]string) error {
 
 	if cmd.Config.Sources.History {
 		go func() {
-			log.Printf("[INFO] Starting watch history crawler")
+			log.Debug().
+				Stringer("interval", cmd.Config.UpdateInterval).
+				Msg("Watch history crawler: starting")
+
 			if err := cmd.crawlHistory(ctx); err != nil {
-				log.Printf("[ERR] Watch history crawler stopped: %v", err)
+				log.Err(err).Msg("Watch history crawler: stopped")
 			}
 		}()
 	}
 
 	if len(cmd.Config.Sources.Playlists) > 0 {
 		go func() {
-			log.Printf("[INFO] Starting playlists crawler")
+			log.Debug().
+				Stringer("interval", cmd.Config.UpdateInterval).
+				Msg("Playlists crawler: starting")
+
 			if err := cmd.crawlAPI(ctx); err != nil {
-				log.Printf("[ERR] Playlists crawler stopped: %v", err)
+				log.Err(err).Msg("Playlists crawler: stopped")
 			}
 		}()
 	}
 
 	if !cmd.DisableDownload {
-		log.Printf("[INFO] Starting downloader")
+		log.Debug().Msg("Downloader: starting")
 		if err := dl.Serve(ctx, cmd.Index); err != nil {
 			return err
 		}
 		return nil
 	}
 
-	log.Printf("[INFO] Downloader is disabled")
+	log.Warn().Msg("Downloader is disabled")
 	<-ctx.Done()
 	return nil
 }
@@ -87,6 +94,8 @@ func (cmd *StartCommand) crawlAPI(ctx context.Context) error {
 	}
 
 	runEveryInterval(ctx, cmd.Config.UpdateInterval, func() {
+		log.Debug().Msg("Playlists: checking for new videos")
+
 		for title, playlistID := range cmd.Config.Sources.Playlists {
 			total := 0
 
@@ -97,7 +106,7 @@ func (cmd *StartCommand) crawlAPI(ctx context.Context) error {
 			for {
 				response, err := call.Do()
 				if err != nil {
-					log.Printf("[ERR] Youtube API: %v", err)
+					log.Err(err).Msg("Youtube API error")
 					break
 				}
 
@@ -108,7 +117,7 @@ func (cmd *StartCommand) crawlAPI(ctx context.Context) error {
 
 				n, err := cmd.Index.Push(videos)
 				if err != nil {
-					log.Printf("[ERR] Playlist `%s`: %v", title, err)
+					log.Err(err).Msgf("Playlist `%s` error", title)
 				}
 
 				total += n
@@ -121,8 +130,16 @@ func (cmd *StartCommand) crawlAPI(ctx context.Context) error {
 				}
 				call.PageToken(response.NextPageToken)
 			}
-			log.Printf("[INFO] Scheduled %d new videos from playlist `%s`", total, title)
+
+			if total > 0 {
+				log.Info().
+					Str("playlist", title).
+					Int("count", total).
+					Msg("New videos from playlist")
+			}
 		}
+
+		log.Debug().Msg("Playlists: done")
 	})
 
 	return nil
@@ -135,7 +152,7 @@ func (cmd *StartCommand) crawlHistory(ctx context.Context) error {
 	}
 
 	runEveryInterval(ctx, cmd.Config.UpdateInterval, func() {
-		log.Printf("[INFO] Checking watch history")
+		log.Debug().Msg("Watch history: checking for new videos")
 
 		err := bro.Do(ctx, func(ctx context.Context, url string) error {
 			videos, err := history.Videos(ctx, url)
@@ -148,14 +165,18 @@ func (cmd *StartCommand) crawlHistory(ctx context.Context) error {
 				return err
 			}
 
-			log.Printf("[INFO] Scheduled %d new videos from watch history", n)
+			if n > 0 {
+				log.Info().Int("count", n).Msg("New videos from watch history")
+			}
 
 			return nil
 		})
 
 		if err != nil {
-			log.Printf("[ERR] Watch history: %v", err)
+			log.Err(err).Msg("Watch history error")
 		}
+
+		log.Debug().Msg("Watch history: done")
 	})
 
 	return nil

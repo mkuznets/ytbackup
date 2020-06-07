@@ -3,11 +3,12 @@ package ytbackup
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"mkuznets.com/go/ytbackup/internal/config"
 	"mkuznets.com/go/ytbackup/internal/index"
 )
@@ -25,6 +26,12 @@ type Command struct {
 }
 
 func (cmd *Command) Init(opts interface{}) error {
+	log.Logger = log.Output(zerolog.ConsoleWriter{
+		Out:        os.Stderr,
+		TimeFormat: "2006-01-02 15:04:05",
+	})
+	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+
 	options, ok := opts.(*Options)
 	if !ok {
 		panic("type mismatch")
@@ -53,8 +60,8 @@ func (cmd *Command) Init(opts interface{}) error {
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		<-signalChan
-		log.Printf("[INFO] Got SIGINT/SIGTERM, graceful shutdown")
+		s := <-signalChan
+		log.Info().Stringer("signal", s).Msgf("Graceful shutdown")
 		cmd.gracefulShutdown()
 	}()
 
@@ -63,7 +70,7 @@ func (cmd *Command) Init(opts interface{}) error {
 
 func (cmd *Command) gracefulShutdown() {
 	if err := cmd.Index.Close(); err != nil {
-		log.Printf("[ERR] Could not close index: %v", err)
+		log.Err(err).Msg("Could not close index")
 	}
 	os.Exit(1)
 }

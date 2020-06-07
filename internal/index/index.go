@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog/log"
 
 	bolt "go.etcd.io/bbolt"
 )
@@ -92,7 +93,7 @@ func (st *Index) Close() error {
 	if err != nil {
 		return err
 	}
-	log.Printf("[DEBUG] index stopped")
+	log.Debug().Msg("Index closed")
 	return nil
 }
 
@@ -142,7 +143,7 @@ func (st *Index) Pop(n int) ([]*Video, error) {
 			}
 
 			if video.Attempt > maxAttempts {
-				log.Printf("[DEBUG] %s reached retry limit, moving it to %s", video.ID, bucketFailed)
+				log.Info().Str("id", video.ID).Msg("Retry limit reached")
 				if err := put(tx, bucketFailed, &video); err != nil {
 					return err
 				}
@@ -170,7 +171,7 @@ func (st *Index) Pop(n int) ([]*Video, error) {
 }
 
 func (st *Index) Retry(id string, mode RetryMode) error {
-	log.Printf("[INFO] Putting %s back to %s", id, bucketNew)
+	log.Info().Str("id", id).Msg("Retry")
 
 	return st.db.Update(func(tx *bolt.Tx) error {
 		key := []byte(id)
@@ -245,7 +246,7 @@ func (st *Index) ensureTimeout(ctx context.Context) {
 			return
 		case <-ticker.C:
 			if err := st.ensureTimeoutOnce(); err != nil {
-				log.Printf("[WARN] EnsureDeadline: %v", err)
+				log.Warn().Err(err).Msg("ensureTimeout error")
 			}
 		}
 	}
@@ -263,13 +264,15 @@ func (st *Index) ensureTimeoutOnce() error {
 			}
 
 			if video.Deadline == nil {
-				log.Printf("[ERR] %s in %s does not have a deadline", key, bucketInProgress)
+				log.Error().
+					Bytes("id", key).
+					Bytes("bucket", bucketInProgress).
+					Msg("Video does not have a deadline")
 				return nil
 			}
 
 			if video.Deadline.Before(time.Now()) {
-				log.Printf("[WARN] %s timed out, putting it back to %s", key, bucketNew)
-
+				log.Warn().Bytes("id", key).Msg("Video timed out, retrying")
 				video.Deadline = nil
 
 				if err := put(tx, bucketNew, &video); err != nil {

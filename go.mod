@@ -14,6 +14,7 @@ require (
 	github.com/pkg/browser v0.0.0-20180916011732-0a3d74bf9ce4
 	github.com/pkg/errors v0.9.1
 	github.com/rakyll/statik v0.1.7
+	github.com/rs/zerolog v1.19.0
 	go.etcd.io/bbolt v1.3.4
 	go.uber.org/config v1.4.0
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d

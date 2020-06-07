@@ -3,10 +3,11 @@ package youtube
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 	"net/url"
 	"sync"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/pkg/browser"
 	"golang.org/x/oauth2"
@@ -54,7 +55,7 @@ func NewToken(ctx context.Context, config *oauth2.Config) (*oauth2.Token, error)
 	wg.Add(1)
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Printf("[ERR] ListenAndServe(): %v", err)
+			log.Err(err).Msg("ListenAndServe()")
 		}
 		wg.Done()
 	}()
@@ -74,12 +75,12 @@ func NewToken(ctx context.Context, config *oauth2.Config) (*oauth2.Token, error)
 
 func openURL(u string) {
 	if err := browser.OpenURL(u); err != nil {
-		log.Printf("[ERR] browser.OpenURL: %v", err)
+		log.Err(err).Msg("browser.OpenURL")
 	}
 }
 
 func stopServer(ctx context.Context, srv *http.Server) {
 	if e := srv.Shutdown(ctx); e != nil {
-		log.Printf("[ERR] shutdown: %v", e)
+		log.Err(e).Msg("Server shutdown")
 	}
 }

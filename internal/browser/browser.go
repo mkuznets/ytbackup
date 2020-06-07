@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
-	"strings"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/go-pkgz/repeater"
 )
@@ -62,14 +62,13 @@ func (b *Browser) Run(ctx context.Context) error {
 	ctxTimeout, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	log.Printf("[DEBUG] running: %s %s", b.executable, strings.Join(b.execArgs, " "))
+	log.Debug().Str("cmd", b.executable).Strs("args", b.execArgs).Msg("Running browser")
 
 	execCmd := exec.CommandContext(ctxTimeout, b.executable, b.execArgs...)
 	if err := execCmd.Run(); err != nil {
 		if errors.Is(ctxTimeout.Err(), context.Canceled) {
 			return nil
 		}
-		log.Printf("[ERR] browser error: %v", err)
 		return err
 	}
 	return nil
@@ -118,7 +117,7 @@ func (b *Browser) Do(ctx context.Context, f func(ctx context.Context, url string
 	go func() {
 		defer wg.Done()
 		if err := b.Run(ctx); err != nil {
-			log.Print(err)
+			log.Err(err).Msg("Browser error")
 		}
 	}()
 

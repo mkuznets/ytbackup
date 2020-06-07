@@ -3,8 +3,9 @@ package ytbackup
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/url"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/mitchellh/go-homedir"
 	"mkuznets.com/go/ytbackup/internal/utils"
@@ -58,8 +59,7 @@ func (cmd *ImportCommand) Execute([]string) error {
 		return err
 	}
 
-	log.Printf("Imported: %d", len(ids))
-	log.Printf("Added with status NEW: %d", n)
+	log.Info().Int("total", len(ids)).Int("new", n).Msg("Import completed")
 
 	return nil
 }
