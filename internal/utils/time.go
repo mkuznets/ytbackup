@@ -15,6 +15,9 @@ func RunEveryInterval(ctx context.Context, interval time.Duration, fun func()) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			if ctx.Err() != nil {
+				return
+			}
 			fun()
 		}
 	}

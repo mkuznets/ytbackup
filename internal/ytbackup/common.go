@@ -1,11 +1,13 @@
 package ytbackup
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sync"
 	"syscall"
 
 	"github.com/rakyll/statik/fs"
@@ -31,6 +33,8 @@ type Command struct {
 	Storages *storages.Storages
 	Venv     *venv.VirtualEnv
 	Config   *Config
+	Wg       *sync.WaitGroup
+	Ctx      context.Context
 }
 
 func (cmd *Command) Init(opts interface{}) error {
@@ -38,6 +42,23 @@ func (cmd *Command) Init(opts interface{}) error {
 		Out:        os.Stderr,
 		TimeFormat: "2006-01-02 15:04:05",
 	})
+
+	// -------------
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cmd.Ctx = ctx
+	cmd.Wg = &sync.WaitGroup{}
+
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		s := <-signalChan
+		log.Info().Stringer("signal", s).Msgf("Graceful shutdown")
+		cancel()
+	}()
+
+	// -------------
 
 	options, ok := opts.(*Options)
 	if !ok {
@@ -95,23 +116,12 @@ func (cmd *Command) Init(opts interface{}) error {
 	}
 	cmd.Index = idx
 
-	// -------------
-
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		s := <-signalChan
-		log.Info().Stringer("signal", s).Msgf("Graceful shutdown")
-		cmd.gracefulShutdown()
-	}()
-
 	return nil
 }
 
-func (cmd *Command) gracefulShutdown() {
+func (cmd *Command) Close() {
+	cmd.Wg.Wait()
 	if err := cmd.Index.Close(); err != nil {
 		log.Err(err).Msg("Could not close index")
 	}
-	os.Exit(1)
 }

@@ -171,7 +171,7 @@ func (st *Index) Pop(n int) ([]*Video, error) {
 }
 
 func (st *Index) Retry(id string, mode RetryMode) error {
-	log.Info().Str("id", id).Msg("Retry")
+	log.Info().Str("id", id).Msg("Retry later")
 
 	return st.db.Update(func(tx *bolt.Tx) error {
 		key := []byte(id)

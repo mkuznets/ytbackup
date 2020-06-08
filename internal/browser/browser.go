@@ -65,6 +65,7 @@ func (b *Browser) Run(ctx context.Context) error {
 	log.Debug().Str("cmd", b.executable).Strs("args", b.execArgs).Msg("Running browser")
 
 	execCmd := exec.CommandContext(ctxTimeout, b.executable, b.execArgs...)
+
 	if err := execCmd.Run(); err != nil {
 		if errors.Is(ctxTimeout.Err(), context.Canceled) {
 			return nil

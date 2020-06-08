@@ -44,35 +44,35 @@ func (dr *Result) Cleanup() {
 }
 
 func (cmd *Command) Serve(ctx context.Context) error {
-	ticker := time.NewTicker(5 * time.Second)
-
 	for {
-		select {
-		case <-ctx.Done():
+		if ctx.Err() != nil {
 			return nil
+		}
 
-		case <-ticker.C:
-			storage, err := cmd.Storages.Get()
-			if err != nil {
-				log.Err(err).Msg("could not find a suitable storage")
-				time.Sleep(time.Minute)
-				continue
-			}
-			videos, err := cmd.Index.Pop(1)
-			if err != nil {
-				log.Err(err).Msg("index: Pop error")
-				continue
-			}
-			cmd.fetchNew(ctx, videos, storage)
+		storage, err := cmd.Storages.Get()
+		if err != nil {
+			log.Err(err).Msg("could not find a suitable storage")
+			time.Sleep(time.Minute)
+			continue
+		}
+		videos, err := cmd.Index.Pop(1)
+		if err != nil {
+			log.Err(err).Msg("index: Pop error")
+			continue
+		}
+		cmd.fetchNew(videos, storage)
+
+		if ctx.Err() == nil {
+			time.Sleep(5 * time.Second)
 		}
 	}
 }
 
-func (cmd *Command) fetchNew(ctx context.Context, videos []*index.Video, storage *storages.Ready) {
+func (cmd *Command) fetchNew(videos []*index.Video, storage *storages.Ready) {
 	for _, video := range videos {
 		log.Info().Str("id", video.ID).Msg("Downloading")
 
-		results, err := cmd.downloadByID(ctx, video.ID, storage.Path)
+		results, err := cmd.downloadByID(video.ID, storage.Path)
 		if err != nil {
 			if isNetworkError(err) {
 				log.Warn().Msgf("Network is down, sleeping for %s", networkDowntime)
@@ -111,8 +111,8 @@ func (cmd *Command) fetchNew(ctx context.Context, videos []*index.Video, storage
 	}
 }
 
-func (cmd *Command) downloadByID(ctx context.Context, videoID, root string) ([]*Result, error) {
-	rctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+func (cmd *Command) downloadByID(videoID, root string) ([]*Result, error) {
+	rctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	url := fmt.Sprintf(ytVideoURLFormat, videoID)

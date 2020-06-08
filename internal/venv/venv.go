@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -88,6 +89,8 @@ func (v *VirtualEnv) run(ctx context.Context, input io.Reader, name string, args
 	v.runLock.Lock()
 	defer v.runLock.Unlock()
 	c := exec.CommandContext(ctx, name, args...)
+	c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
+
 	if input != nil {
 		c.Stdin = input
 	}

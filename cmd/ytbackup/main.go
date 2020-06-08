@@ -11,6 +11,7 @@ import (
 type Commander interface {
 	Init(opts interface{}) error
 	Execute(args []string) error
+	Close()
 }
 
 func main() {
@@ -27,6 +28,7 @@ func main() {
 		if err := c.Init(opts.Common); err != nil {
 			return err
 		}
+		defer c.Close()
 		if err := c.Execute(args); err != nil {
 			return err
 		}
