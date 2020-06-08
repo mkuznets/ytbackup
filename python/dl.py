@@ -13,14 +13,13 @@ import shutil
 import socket
 import subprocess as sp
 import sys
-import tempfile
 import typing
 import urllib.error
 from unittest import mock
 
 NETWORK_EXCS = (urllib.error.URLError, http.client.HTTPException, socket.error)
+SUMS_FILENAME = "SHA256SUMS"
 
-DEFAULT_TMP_ROOT = os.path.join(tempfile.gettempdir(), 'ytbackup')
 STDERR = sys.stderr
 
 
@@ -149,14 +148,14 @@ def create_progress_hook(logger):
     return log_hook
 
 
-def sha256sum(filename):
+def sha256sum(filename: str) -> str:
     h = hashlib.sha256()
     b = bytearray(128 * 1024)
     mv = memoryview(b)
     with open(filename, 'rb', buffering=0) as f:
         for n in iter(lambda: f.readinto(mv), 0):
             h.update(mv[:n])
-    return f"sha256:{h.hexdigest()}"
+    return h.hexdigest()
 
 
 # ------------------------------------------------------------------------------
@@ -199,21 +198,30 @@ class Download:
         if not shutil.which('zip'):
             raise Error('could not find zip binary')
 
-        tmp_root: str = os.path.abspath(args.tmp)
-
-        self.output_dir = os.path.join(tmp_root, f'dl_{urls_hash(args.urls)}')
-        os.makedirs(self.output_dir, exist_ok=True)
-
         self.urls: typing.List[str] = args.urls
-
         self.logger = get_logger(args.log)
 
+        # ----------------------------------------------------------------------
+
+        self.root: str = os.path.abspath(os.path.expanduser(args.root))
+
+        tmp_dir: str = os.path.join(self.root, ".tmp")
+
+        self.output_dir = os.path.join(tmp_dir, f'dl_{urls_hash(args.urls)}')
+        os.makedirs(self.output_dir, exist_ok=True)
+
+        # Cache for youtube-dl
+        cache_dir = args.cache or os.path.join(tmp_dir, 'ydl_cache')
+        os.makedirs(cache_dir, exist_ok=True)
+
+        # ----------------------------------------------------------------------
+
         opts: dict = getattr(Preset(logger=self.logger), args.preset)
-        opts['outtmpl'] = os.path.join(
-            self.output_dir, '%(upload_date)s_%(id)s/%(id)s.%(ext)s'
+        opts.update(
+            outtmpl=os.path.join(self.output_dir, '%(upload_date)s_%(id)s/%(id)s.%(ext)s'),
+            progress_hooks=[create_progress_hook(self.logger)],
+            cachedir=cache_dir,
         )
-        opts['progress_hooks'] = [create_progress_hook(self.logger)]
-        opts['cachedir'] = os.path.join(tmp_root, 'ydl_cache')
 
         self.opts = opts
 
@@ -240,7 +248,6 @@ class Download:
             raise
 
         os.chdir(self.output_dir)
-
         result = []
 
         for info in infos.values():
@@ -248,28 +255,36 @@ class Download:
             if not os.path.exists(video_dir):
                 continue
 
-            zip_filename = video_dir + '.zip'
+            upload_date = dt.datetime.strptime(info['upload_date'], '%Y%m%d').date()
+            dest_dir = os.path.join(self.root, upload_date.strftime("%Y"), upload_date.strftime("%m"))
+            os.makedirs(dest_dir, exist_ok=True)
+
+            zip_path = os.path.join(dest_dir, video_dir + '.zip')
+
             try:
-                os.remove(zip_filename)
+                os.remove(zip_path)
             except OSError:
                 pass
 
             r = sp.run(
-                ['zip', '-q', '-0', '-r', zip_filename, video_dir],
+                ['zip', '-q', '-0', '-r', zip_path, video_dir],
                 stdout=sp.PIPE, stderr=sp.STDOUT
             )
             if r.returncode:
                 raise Error(r.stdout.decode().strip())
 
             try:
-                fi = os.stat(zip_filename)
+                fi = os.stat(zip_path)
             except OSError as exc:
                 raise Error(f'could not stat zip file') from exc
 
-            filesize = fi.st_size
-            filehash = sha256sum(zip_filename)
+            dest_path_rel = os.path.relpath(zip_path, self.root)
 
-            upload_date = dt.datetime.strptime(info['upload_date'], '%Y%m%d').date()
+            filehash = sha256sum(zip_path)
+            with open(os.path.join(self.root, SUMS_FILENAME), "a") as f:
+                f.write(f"{filehash} *{dest_path_rel}\n")
+                f.flush()
+                os.fsync(f.fileno())
 
             redundant_keys = (
                 'formats', 'requested_formats', 'format', 'format_id', 'requested_subtitles',
@@ -283,9 +298,10 @@ class Download:
                 'title': info.get('title', '<missing title>'),
                 'uploader': info.get('uploader', '<unknown uploader>'),
                 'upload_date': upload_date.isoformat(),
-                'file': os.path.join(self.output_dir, zip_filename),
-                'filesize': filesize,
+                'file': zip_path,
+                'filesize': fi.st_size,
                 'filehash': filehash,
+                'output_dir': self.output_dir,
                 'info': info,
             })
 
@@ -304,7 +320,8 @@ def arg_parser():
 
     subcmd = subparsers.add_parser('download')
     subcmd.set_defaults(func=Download)
-    subcmd.add_argument('--tmp', default=DEFAULT_TMP_ROOT)
+    subcmd.add_argument('--root', required=True)
+    subcmd.add_argument('--cache')
     subcmd.add_argument('--preset', choices=['video', 'audio'], default='video')
     subcmd.add_argument('urls', nargs='+')
 

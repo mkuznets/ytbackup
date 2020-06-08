@@ -272,7 +272,7 @@ func (st *Index) ensureTimeoutOnce() error {
 			}
 
 			if video.Deadline.Before(time.Now()) {
-				log.Warn().Bytes("id", key).Msg("Video timed out, retrying")
+				log.Warn().Bytes("id", key).Msg("Download timed out, retrying")
 				video.Deadline = nil
 
 				if err := put(tx, bucketNew, &video); err != nil {

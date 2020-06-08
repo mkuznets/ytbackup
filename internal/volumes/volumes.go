@@ -37,6 +37,13 @@ func New(paths []string) (*Volumes, error) {
 	return volumes, nil
 }
 
+func (vs *Volumes) Root() (key, path string) {
+	for key, path := range vs.vols {
+		return key, path
+	}
+	panic("unreachable")
+}
+
 func (vs *Volumes) Put(src, dst string) (string, error) {
 	srcFile, err := os.Open(src)
 	if err != nil {

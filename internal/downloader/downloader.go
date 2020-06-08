@@ -50,13 +50,20 @@ func New(vs *volumes.Volumes) (*Downloader, error) {
 	return dl, nil
 }
 
-func (dl *Downloader) Download(ctx context.Context, videoID string) ([]*Result, error) {
+func (dl *Downloader) Download(ctx context.Context, videoID, root string) ([]*Result, error) {
 	rctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
 	url := fmt.Sprintf(ytVideoURLFormat, videoID)
 
-	cargs := []string{"/dl.py", "--log=/tmp/ytbackup/dl.log", "download", url}
+	cargs := []string{
+		"/dl.py",
+		"--log=/tmp/ytbackup/dl.log",
+		"download",
+		fmt.Sprintf("--root=%s", root),
+		"--cache=/tmp/ytbackup/ydl_cache/",
+		url,
+	}
 
 	var result []*Result
 
@@ -79,6 +86,8 @@ func (dl *Downloader) Serve(ctx context.Context, db *index.Index) error {
 
 			found := len(videos) > 0
 
+			vol, root := dl.volumes.Root()
+
 			for _, video := range videos {
 				log.Info().Str("id", video.ID).Msg("Downloading")
 
@@ -86,7 +95,7 @@ func (dl *Downloader) Serve(ctx context.Context, db *index.Index) error {
 					return fmt.Errorf("limiter wait: %v", err)
 				}
 
-				results, err := dl.Download(ctx, video.ID)
+				results, err := dl.Download(ctx, video.ID, root)
 				if err != nil {
 					if e, ok := err.(*venv.ScriptError); ok && e.Reason == "network" {
 						_ = db.Retry(video.ID, index.RetryInfinite)
@@ -102,17 +111,15 @@ func (dl *Downloader) Serve(ctx context.Context, db *index.Index) error {
 				}
 
 				for _, res := range results {
-					storagePath := res.StoragePath()
-
 					err := func() (err error) {
-						vol, err := dl.volumes.Put(res.File, storagePath)
+						relPath, err := filepath.Rel(root, res.File)
 						if err != nil {
-							return fmt.Errorf("storage error: %v", err)
+							return err
 						}
 
 						v := &index.Video{
 							ID:       res.ID,
-							Storages: []index.Storage{{ID: vol, Key: storagePath}},
+							Storages: []index.Storage{{ID: vol, Key: relPath}},
 							File:     &index.File{Hash: res.FileHash, Size: res.FileSize},
 							Info:     res.Info,
 						}
