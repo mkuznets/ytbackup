@@ -161,30 +161,6 @@ def sha256sum(filename: str) -> str:
 # ------------------------------------------------------------------------------
 
 
-class Info:
-    def __init__(self, args: argparse.Namespace):
-        self.url: str = args.url
-
-    def execute(self) -> typing.Any:
-        import youtube_dl
-
-        infos = []
-
-        def process_info(data):
-            infos.append({
-                'id': data['id'],
-                'url': data['webpage_url'],
-                'is_live': bool(data['is_live']),
-                'duration': int(data['duration'] or 0),
-            })
-
-        ydl = youtube_dl.YoutubeDL(Preset().info_opts)
-        with mock.patch.object(ydl, 'process_info', process_info):
-            ydl.download([self.url])
-
-        return infos
-
-
 def urls_hash(urls: typing.List[str]) -> str:
     h = hashlib.sha1()
     for url in sorted(urls):
@@ -295,13 +271,11 @@ class Download:
 
             result.append({
                 'id': info['id'],
-                'title': info.get('title', '<missing title>'),
-                'uploader': info.get('uploader', '<unknown uploader>'),
-                'upload_date': upload_date.isoformat(),
                 'file': zip_path,
                 'filesize': fi.st_size,
                 'filehash': filehash,
                 'output_dir': self.output_dir,
+                'storage_path': os.path.relpath(zip_path, self.root),
                 'info': info,
             })
 
@@ -313,10 +287,6 @@ def arg_parser():
     parser.add_argument('--log')
 
     subparsers = parser.add_subparsers(dest='command', required=True)
-
-    subcmd = subparsers.add_parser('info')
-    subcmd.set_defaults(func=Info)
-    subcmd.add_argument('url')
 
     subcmd = subparsers.add_parser('download')
     subcmd.set_defaults(func=Download)

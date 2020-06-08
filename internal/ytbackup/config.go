@@ -3,14 +3,12 @@ package ytbackup
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/mitchellh/go-homedir"
 	"golang.org/x/oauth2"
 	"mkuznets.com/go/ytbackup/internal/browser"
-	"mkuznets.com/go/ytbackup/internal/volumes"
 	"mkuznets.com/go/ytbackup/pkg/obscure"
 )
 
@@ -28,8 +26,8 @@ type Config struct {
 		History   bool
 		Playlists map[string]string
 	}
-	Destinations Volumes
-	Youtube      struct {
+	Storages []Storage
+	Youtube  struct {
 		OAuth OAuth `yaml:"oauth"`
 	}
 	UpdateInterval time.Duration `yaml:"update_interval"`
@@ -39,10 +37,8 @@ type Config struct {
 	Browser Browser
 }
 
-type Volumes []string
-
-func (vs *Volumes) New() (*volumes.Volumes, error) {
-	return volumes.New(*vs)
+type Storage struct {
+	Path string
 }
 
 type Browser struct {
@@ -92,7 +88,7 @@ func (cfg *Config) Validate() error {
 			return fmt.Errorf("playlists are enabled, but youtube config is invalid:\n%v", err)
 		}
 	}
-	if err := cfg.validateDestinations(); err != nil {
+	if err := cfg.validateStorages(); err != nil {
 		return err
 	}
 	return nil
@@ -127,40 +123,22 @@ func (cfg *Config) validateBrowser() error {
 	return nil
 }
 
-func (cfg *Config) validateDestinations() (err error) {
-	if len(cfg.Destinations) == 0 {
-		return errors.New("at least one destination directory must be configured")
+func (cfg *Config) validateStorages() (err error) {
+	if len(cfg.Storages) == 0 {
+		return errors.New("at least one storage must be configured")
 	}
 
-	for i := range cfg.Destinations {
-		path, err := homedir.Expand(cfg.Destinations[i])
+	for i := range cfg.Storages {
+		path, err := homedir.Expand(cfg.Storages[i].Path)
 		if err != nil {
 			return fmt.Errorf("could not expand destination path: %v", err)
 		}
-		cfg.Destinations[i] = path
-
-		fi, err := os.Stat(path)
+		path, err = filepath.Abs(path)
 		if err != nil {
-			if os.IsNotExist(err) {
-				return fmt.Errorf("destination path does not exist: %s", path)
-			}
-			return fmt.Errorf("could not open destination path %s: %v", path, err)
-		}
-		if !fi.IsDir() {
-			return fmt.Errorf("provided destination path is not a directory: %s", path)
-		}
-
-		f, err := ioutil.TempFile(path, ".tmp*")
-		if err != nil {
-			return fmt.Errorf("destination path is not writable: %s", path)
-		}
-		_ = f
-		if err := os.Remove(f.Name()); err != nil {
 			return err
 		}
-		if err := f.Close(); err != nil {
-			return err
-		}
+		cfg.Storages[i].Path = path
 	}
+
 	return nil
 }

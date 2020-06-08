@@ -20,11 +20,11 @@ func (v *Video) Key() []byte {
 }
 
 type Storage struct {
-	ID  string `json:"id"`
-	Key string `json:"key"`
+	ID   string `json:"id"`
+	Path string `json:"path"`
 }
 
 type File struct {
 	Hash string `json:"hash"`
-	Size int    `json:"size"`
+	Size uint64 `json:"size"`
 }
