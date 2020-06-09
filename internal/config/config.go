@@ -1,13 +1,10 @@
 package config
 
 import (
-	"bytes"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/rs/zerolog/log"
+	"mkuznets.com/go/ytbackup/internal/appdirs"
 
 	"github.com/mitchellh/go-homedir"
 	"go.uber.org/config"
@@ -58,33 +55,20 @@ func (r *Reader) yamlOptions() ([]config.YAMLOption, error) {
 		options = append(options, config.Source(strings.NewReader(r.defaultConfig)))
 	}
 
-	home, err := homedir.Dir()
-	if err != nil {
-		return nil, err
-	}
-
 	// Alternative config from one of default paths
-	altPath := ""
-	if configHome, ok := os.LookupEnv("XDG_CONFIG_HOME"); ok {
-		altPath = filepath.Join(configHome, r.filename)
-	} else {
-		altPath = filepath.Join(home, ".config", r.filename)
-	}
-
-	content, err := ioutil.ReadFile(altPath)
-	if err == nil {
-		log.Debug().Str("path", altPath).Msg("Config file found")
-		options = append(options, config.Source(bytes.NewBuffer(content)))
+	if path, ok := appdirs.SearchConfig(r.filename); ok {
+		log.Debug().Str("path", path).Msg("Config file")
+		options = append(options, config.File(path))
 	}
 
 	// Explicit config passed via CLI arguments
 	if r.explicitPath != "" {
-		absPath, err := homedir.Expand(r.explicitPath)
+		path, err := homedir.Expand(r.explicitPath)
 		if err != nil {
 			return nil, err
 		}
-		log.Debug().Str("path", absPath).Msg("Config file found")
-		options = append(options, config.File(absPath))
+		log.Debug().Str("path", path).Msg("Config file")
+		options = append(options, config.File(path))
 	}
 
 	return options, nil
