@@ -56,23 +56,18 @@ func (cmd *Command) Init(opts interface{}) error {
 
 	go func() {
 		cnt := 0
-		for {
-			select {
-			case s := <-signalChan:
-				switch cnt {
-				case 0:
-					log.Warn().Stringer("signal", s).Msgf("Graceful termination")
-					cancel()
-				case 1:
-					log.Warn().Msgf("Send one more signal for hard termination")
-				case 2:
-					log.Warn().Msgf("Hard termination")
-					os.Exit(1)
-				}
-				cnt++
-			case <-cmd.Ctx.Done():
-				return
+		for s := range signalChan {
+			switch cnt {
+			case 0:
+				log.Warn().Stringer("signal", s).Msgf("Graceful termination")
+				cancel()
+			case 1:
+				log.Warn().Msgf("Send one more signal for hard termination")
+			case 2:
+				log.Warn().Msgf("Hard termination")
+				os.Exit(1)
 			}
+			cnt++
 		}
 	}()
 
