@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -117,14 +118,23 @@ func (cmd *Command) downloadByID(videoID, root string) ([]*Result, error) {
 
 	url := fmt.Sprintf(ytVideoURLFormat, videoID)
 
+	cacheDir := cmd.Config.Dirs.Cache
+
+	logPath := filepath.Join(
+		cmd.Config.Dirs.Logs,
+		fmt.Sprintf("%s_%s.log", time.Now().Format("2006-01-02T15-04-05"), videoID),
+	)
+
 	cargs := []string{
 		"/dl.py",
-		"--log=/tmp/ytbackup/dl.log",
+		"--log=" + logPath,
 		"download",
-		fmt.Sprintf("--root=%s", root),
-		"--cache=/tmp/ytbackup/ydl_cache/",
+		"--root=" + root,
+		"--cache=" + cacheDir,
 		url,
 	}
+
+	log.Debug().Strs("args", cargs).Msg("Running python")
 
 	var result []*Result
 	if err := cmd.Venv.RunScript(rctx, &result, cargs...); err != nil {

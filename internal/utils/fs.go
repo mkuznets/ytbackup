@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
+
+	"github.com/mitchellh/go-homedir"
 )
 
 func IsWritableDir(path string) (err error) {
@@ -31,4 +34,16 @@ func IsWritableDir(path string) (err error) {
 	}
 
 	return nil
+}
+
+func MustExpand(path string) string {
+	expanded, err := homedir.Expand(path)
+	if err != nil {
+		panic(err)
+	}
+	absPath, err := filepath.Abs(expanded)
+	if err != nil {
+		panic(err)
+	}
+	return absPath
 }

@@ -110,7 +110,7 @@ func (cmd *Command) Init(opts interface{}) error {
 
 	// -------------
 
-	idx := index.New("index.db")
+	idx := index.New(filepath.Join(cmd.Config.Dirs.Data, "index.db"))
 	if err := idx.Init(); err != nil {
 		return fmt.Errorf("could not initialise store: %v", err)
 	}

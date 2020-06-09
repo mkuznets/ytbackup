@@ -3,12 +3,16 @@ package ytbackup
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
-	"github.com/mitchellh/go-homedir"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/oauth2"
+	"mkuznets.com/go/ytbackup/internal/appdirs"
 	"mkuznets.com/go/ytbackup/internal/browser"
+	"mkuznets.com/go/ytbackup/internal/utils"
 	"mkuznets.com/go/ytbackup/pkg/obscure"
 )
 
@@ -25,6 +29,11 @@ type Config struct {
 	Sources struct {
 		History   bool
 		Playlists map[string]string
+	}
+	Dirs struct {
+		Cache string
+		Data  string
+		Logs  string
 	}
 	Storages []Storage
 	Youtube  struct {
@@ -78,6 +87,10 @@ func NewCredentials(token *oauth2.Token) *OAuth {
 }
 
 func (cfg *Config) Validate() error {
+	if err := cfg.validateDirs(); err != nil {
+		return err
+	}
+
 	if cfg.Sources.History {
 		if err := cfg.validateBrowser(); err != nil {
 			return fmt.Errorf("watch history is enabled, but browser is misconfigured:\n%v", err)
@@ -91,6 +104,50 @@ func (cfg *Config) Validate() error {
 	if err := cfg.validateStorages(); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (cfg *Config) validateDirs() error {
+	paths := make(map[string]string)
+
+	// ---
+
+	if cfg.Dirs.Cache == "" {
+		cfg.Dirs.Cache = filepath.Join(appdirs.Cache, "ytbackup")
+	}
+	cfg.Dirs.Cache = utils.MustExpand(cfg.Dirs.Cache)
+	paths["dirs.cache"] = cfg.Dirs.Cache
+
+	// ---
+
+	if cfg.Dirs.Data == "" {
+		cfg.Dirs.Data = filepath.Join(appdirs.Data, "ytbackup")
+	}
+	cfg.Dirs.Data = utils.MustExpand(cfg.Dirs.Data)
+	paths["dirs.data"] = cfg.Dirs.Data
+
+	// ---
+
+	if cfg.Dirs.Logs == "" {
+		cfg.Dirs.Logs = filepath.Join(appdirs.State, "ytbackup")
+	}
+	cfg.Dirs.Logs = utils.MustExpand(cfg.Dirs.Logs)
+	paths["dirs.logs"] = cfg.Dirs.Logs
+
+	// ---
+
+	for key, path := range paths {
+		if err := os.MkdirAll(path, os.FileMode(0755)); err != nil {
+			return fmt.Errorf("could not create `%s`: %v", key, err)
+		}
+		if err := utils.IsWritableDir(path); err != nil {
+			return fmt.Errorf("`%s`: %v", key, err)
+		}
+
+		purpose := strings.Title(strings.Split(key, ".")[1])
+		log.Debug().Str("path", path).Msgf("%s dir", purpose)
+	}
+
 	return nil
 }
 
@@ -113,12 +170,7 @@ func (cfg *Config) validateBrowser() error {
 	if bcfg.DataDir == "" {
 		return errors.New("`browser.data_dir` is required")
 	}
-
-	absDataDir, err := homedir.Expand(bcfg.DataDir)
-	if err != nil {
-		return fmt.Errorf("could not expand `browser.data_dir`: %v", err)
-	}
-	bcfg.DataDir = absDataDir
+	bcfg.DataDir = utils.MustExpand(bcfg.DataDir)
 
 	return nil
 }
@@ -128,16 +180,8 @@ func (cfg *Config) validateStorages() (err error) {
 		return errors.New("at least one storage must be configured")
 	}
 
-	for i := range cfg.Storages {
-		path, err := homedir.Expand(cfg.Storages[i].Path)
-		if err != nil {
-			return fmt.Errorf("could not expand destination path: %v", err)
-		}
-		path, err = filepath.Abs(path)
-		if err != nil {
-			return err
-		}
-		cfg.Storages[i].Path = path
+	for i, st := range cfg.Storages {
+		cfg.Storages[i].Path = utils.MustExpand(st.Path)
 	}
 
 	return nil
