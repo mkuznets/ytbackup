@@ -18,6 +18,8 @@ import (
 const (
 	marker           = "__progress__"
 	progressInterval = 5 * time.Second
+	idleTimeout      = 3 * time.Minute
+	leftWarning      = time.Minute
 )
 
 type Progress struct {
@@ -27,7 +29,7 @@ type Progress struct {
 	Finished   bool
 }
 
-func trackProgress(ctx context.Context, path string) {
+func trackProgress(ctx context.Context, cancel context.CancelFunc, path string) {
 	nopLogger := stdlog.New(ioutil.Discard, "", 0)
 
 	t, err := tail.TailFile(path, tail.Config{Follow: true, Logger: nopLogger})
@@ -37,6 +39,31 @@ func trackProgress(ctx context.Context, path string) {
 	}
 	limiter := rate.NewLimiter(rate.Every(progressInterval), 1)
 
+	lastEvent := time.Now()
+
+	go func(last *time.Time) {
+		for {
+			if ctx.Err() != nil {
+				return
+			}
+			idle := time.Since(*last)
+			left := idleTimeout - idle
+			if idle >= idleTimeout {
+				log.Error().Msg("Stopping idle download")
+				cancel()
+				return
+			}
+			if left <= leftWarning {
+				log.Warn().Msgf("Download is idle, will be stopped in %s", left.Truncate(time.Second))
+			}
+			sleep := 10 * time.Second
+			if left < sleep {
+				sleep = left
+			}
+			time.Sleep(sleep)
+		}
+	}(&lastEvent)
+
 Loop:
 	for {
 		select {
@@ -44,11 +71,13 @@ Loop:
 			if ctx.Err() != nil {
 				break Loop
 			}
-
 			if line.Err != nil {
 				log.Warn().Err(err).Msg("Tail error")
 				break Loop
 			}
+
+			lastEvent = time.Now()
+
 			if !strings.Contains(line.Text, marker) {
 				continue
 			}
