@@ -1,6 +1,5 @@
 package start
 
-import "C"
 import (
 	"context"
 	"encoding/json"
@@ -135,6 +134,8 @@ func (cmd *Command) downloadByID(videoID, root string) ([]*Result, error) {
 	}
 
 	log.Debug().Strs("args", cargs).Msg("Running python")
+
+	go trackProgress(rctx, logPath)
 
 	var result []*Result
 	if err := cmd.Venv.RunScript(rctx, &result, cargs...); err != nil {

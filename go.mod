@@ -8,6 +8,7 @@ require (
 	github.com/chromedp/chromedp v0.5.3
 	github.com/go-pkgz/repeater v1.1.3
 	github.com/gofrs/uuid v3.3.0+incompatible
+	github.com/hpcloud/tail v1.0.0
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/joho/godotenv v1.3.0
 	github.com/mitchellh/go-homedir v1.1.0
@@ -21,5 +22,7 @@ require (
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 	golang.org/x/tools v0.0.0-20200213224642-88e652f7a869 // indirect
 	google.golang.org/api v0.17.0
+	gopkg.in/fsnotify.v1 v1.4.7 // indirect
+	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.2.7
 )

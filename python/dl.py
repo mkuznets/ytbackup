@@ -138,12 +138,20 @@ def get_logger(filename: typing.Optional[str] = None):
 
 def create_progress_hook(logger):
     def log_hook(data):
-        logger.info(
-            "%s, elapsed: %.1f, eta: %s",
-            data.get('status', '<unknown status>'),
-            data.get('elapsed', None),
-            data.get('eta', None)
-        )
+        size_done = data.get('downloaded_bytes', None)
+        size_total = data.get('total_bytes', None)
+
+        report = {
+            'finished': data.get('status') == 'finished',
+            'done': 'unk',
+        }
+
+        if size_done is not None and size_total is not None:
+            report['downloaded'] = size_done
+            report['total'] = size_total
+            report['done'] = f'{(size_done * 100 / size_total):.1f}%'
+
+        logger.info("__progress__ %s", json.dumps(report))
 
     return log_hook
 
