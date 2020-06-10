@@ -3,11 +3,8 @@ package start
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
 	"strings"
 	"time"
-
-	stdlog "log"
 
 	"github.com/hpcloud/tail"
 	"github.com/rs/zerolog/log"
@@ -30,13 +27,21 @@ type Progress struct {
 }
 
 func trackProgress(ctx context.Context, cancel context.CancelFunc, path string) {
-	nopLogger := stdlog.New(ioutil.Discard, "", 0)
+	cfg := tail.Config{Follow: true, Logger: tail.DiscardingLogger}
 
-	t, err := tail.TailFile(path, tail.Config{Follow: true, Logger: nopLogger})
+	mainLog, err := tail.TailFile(path, cfg)
 	if err != nil {
 		log.Warn().Err(err).Msg("Could not track progress")
 		return
 	}
+
+	ffmpegPath := strings.Replace(path, ".log", "-ffmpeg.log", 1)
+	ffmpegLog, err := tail.TailFile(ffmpegPath, cfg)
+	if err != nil {
+		log.Warn().Err(err).Msg("Could not track progress")
+		return
+	}
+
 	limiter := rate.NewLimiter(rate.Every(progressInterval), 1)
 
 	lastEvent := time.Now()
@@ -47,6 +52,7 @@ func trackProgress(ctx context.Context, cancel context.CancelFunc, path string) 
 				return
 			}
 			idle := time.Since(*last)
+			log.Info().Stringer("idle", idle).Msg("idle")
 			left := idleTimeout - idle
 			if idle >= idleTimeout {
 				log.Error().Msg("Stopping idle download")
@@ -67,7 +73,10 @@ func trackProgress(ctx context.Context, cancel context.CancelFunc, path string) 
 Loop:
 	for {
 		select {
-		case line := <-t.Lines:
+		case <-ffmpegLog.Lines:
+			lastEvent = time.Now()
+
+		case line := <-mainLog.Lines:
 			if ctx.Err() != nil {
 				break Loop
 			}
@@ -104,8 +113,14 @@ Loop:
 		}
 	}
 
-	if err := t.Stop(); err != nil {
-		log.Debug().Err(err).Msg("Could not close tail")
+	cleanupTails(mainLog, ffmpegLog)
+}
+
+func cleanupTails(tails ...*tail.Tail) {
+	for _, t := range tails {
+		if err := t.Stop(); err != nil {
+			log.Debug().Err(err).Msg("Could not close tail")
+		}
+		t.Cleanup()
 	}
-	t.Cleanup()
 }
