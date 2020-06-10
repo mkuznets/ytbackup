@@ -67,6 +67,7 @@ class Preset:
         opts = copy.deepcopy(YDLOpts.common)
         opts.update(YDLOpts.download)
         if self.logger:
+            # noinspection PyTypeChecker
             opts['logger'] = self.logger
         return opts
 
@@ -95,6 +96,7 @@ class Error(Exception):
 
     def __init__(self, *args, reason=None, **kwargs):
         self.reason = reason or 'unknown'
+        # noinspection PyArgumentList
         super().__init__(*args, **kwargs)
 
 
@@ -123,7 +125,7 @@ def get_logger(filename: typing.Optional[str] = None):
     if not logger.handlers:
         stream = STDERR
         if filename:
-            stream = open(filename, 'a+')
+            stream = open(filename, 'a')
 
         handler = logging.StreamHandler(stream)
 
@@ -149,13 +151,14 @@ def create_progress_hook(logger):
         if size_done is not None and size_total is not None:
             report['downloaded'] = size_done
             report['total'] = size_total
-            report['done'] = f'{(size_done * 100 / size_total):.1f}%'
+            report['done'] = '%.2f%%' % (size_done * 100 / size_total)
 
         logger.info("__progress__ %s", json.dumps(report))
 
     return log_hook
 
 
+# noinspection PyUnresolvedReferences
 def sha256sum(filename: str) -> str:
     h = hashlib.sha256()
     b = bytearray(128 * 1024)
@@ -182,16 +185,16 @@ class Download:
         if not shutil.which('zip'):
             raise Error('could not find zip binary')
 
-        self.urls: typing.List[str] = args.urls
+        self.urls = args.urls
         self.logger = get_logger(args.log)
 
         # ----------------------------------------------------------------------
 
-        self.root: str = os.path.abspath(os.path.expanduser(args.root))
+        self.root = os.path.abspath(os.path.expanduser(args.root))
 
-        tmp_dir: str = os.path.join(self.root, ".tmp")
+        tmp_dir = os.path.join(self.root, ".tmp")
 
-        self.output_dir = os.path.join(tmp_dir, f'dl_{urls_hash(args.urls)}')
+        self.output_dir = os.path.join(tmp_dir, 'dl_{}'.format(urls_hash(args.urls)))
         os.makedirs(self.output_dir, exist_ok=True)
 
         # Cache for youtube-dl
@@ -200,11 +203,14 @@ class Download:
 
         # ----------------------------------------------------------------------
 
-        opts: dict = getattr(Preset(logger=self.logger), args.preset)
+        ffmpeg_log = str(args.log).replace('.log', '-ffmpeg.log')
+
+        opts = getattr(Preset(logger=self.logger), args.preset)
         opts.update(
             outtmpl=os.path.join(self.output_dir, '%(upload_date)s_%(id)s/%(id)s.%(ext)s'),
             progress_hooks=[create_progress_hook(self.logger)],
             cachedir=cache_dir,
+            postprocessor_args=['-progress', 'file:{}'.format(ffmpeg_log)],
         )
 
         self.opts = opts
@@ -235,7 +241,7 @@ class Download:
         result = []
 
         for info in infos.values():
-            video_dir = f"{info['upload_date']}_{info['id']}"
+            video_dir = "{}_{}".format(info['upload_date'], info['id'])
             if not os.path.exists(video_dir):
                 continue
 
@@ -260,13 +266,13 @@ class Download:
             try:
                 fi = os.stat(zip_path)
             except OSError as exc:
-                raise Error(f'could not stat zip file') from exc
+                raise Error('could not stat zip file') from exc
 
             dest_path_rel = os.path.relpath(zip_path, self.root)
 
             filehash = sha256sum(zip_path)
             with open(os.path.join(self.root, SUMS_FILENAME), "a") as f:
-                f.write(f"{filehash} *{dest_path_rel}\n")
+                f.write("{} *{}\n".format(filehash, dest_path_rel))
                 f.flush()
                 os.fsync(f.fileno())
 
@@ -294,7 +300,7 @@ def arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('--log')
 
-    subparsers = parser.add_subparsers(dest='command', required=True)
+    subparsers = parser.add_subparsers(dest='command')
 
     subcmd = subparsers.add_parser('download')
     subcmd.set_defaults(func=Download)
@@ -321,7 +327,7 @@ def main():
             reason = exc.reason
         else:
             logger.exception("unknown error")
-            msg = f'{exc.__class__.__name__}: {str(exc)}'
+            msg = '{}: {}'.format(exc.__class__.__name__, str(exc))
             reason = 'unknown'
 
         json_dump({
