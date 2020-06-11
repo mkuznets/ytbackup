@@ -4,6 +4,7 @@ import argparse
 import contextlib
 import copy
 import datetime as dt
+import glob
 import hashlib
 import http.client
 import json
@@ -11,14 +12,13 @@ import logging
 import os
 import shutil
 import socket
-import subprocess as sp
+import stat
 import sys
 import typing
 import urllib.error
 from unittest import mock
 
 NETWORK_EXCS = (urllib.error.URLError, http.client.HTTPException, socket.error)
-SUMS_FILENAME = "SHA256SUMS"
 
 STDERR = sys.stderr
 
@@ -35,6 +35,7 @@ class YDLOpts:
         'ignoreerrors': False,
         'geo_bypass': True,
         'verbose': True,
+        'prefer_ffmpeg': True,
     }
     download = {
         'write_all_thumbnails': True,
@@ -182,9 +183,6 @@ def urls_hash(urls: typing.List[str]) -> str:
 
 class Download:
     def __init__(self, args: argparse.Namespace):
-        if not shutil.which('zip'):
-            raise Error('could not find zip binary')
-
         self.urls = args.urls
         self.logger = get_logger(args.log)
 
@@ -203,15 +201,16 @@ class Download:
 
         # ----------------------------------------------------------------------
 
-        ffmpeg_log = str(args.log).replace('.log', '-ffmpeg.log')
-
         opts = getattr(Preset(logger=self.logger), args.preset)
         opts.update(
             outtmpl=os.path.join(self.output_dir, '%(upload_date)s_%(id)s/%(id)s.%(ext)s'),
             progress_hooks=[create_progress_hook(self.logger)],
             cachedir=cache_dir,
-            postprocessor_args=['-progress', 'file:{}'.format(ffmpeg_log)],
         )
+
+        if args.log:
+            ffmpeg_log = str(args.log).replace('.log', '-ffmpeg.log')
+            opts['postprocessor_args'] = ['-progress', 'file:{}'.format(ffmpeg_log)]
 
         self.opts = opts
 
@@ -237,44 +236,49 @@ class Download:
                 raise Error('network unavailable', reason='network') from exc
             raise
 
-        os.chdir(self.output_dir)
         result = []
 
         for info in infos.values():
-            video_dir = "{}_{}".format(info['upload_date'], info['id'])
-            if not os.path.exists(video_dir):
+
+            dir_name = "{}_{}".format(info['upload_date'], info['id'])
+
+            result_dir = os.path.join(self.output_dir, dir_name)
+            if not os.path.exists(result_dir):
                 continue
 
             upload_date = dt.datetime.strptime(info['upload_date'], '%Y%m%d').date()
-            dest_dir = os.path.join(self.root, upload_date.strftime("%Y"), upload_date.strftime("%m"))
-            os.makedirs(dest_dir, exist_ok=True)
-
-            zip_path = os.path.join(dest_dir, video_dir + '.zip')
-
-            try:
-                os.remove(zip_path)
-            except OSError:
-                pass
-
-            r = sp.run(
-                ['zip', '-q', '-0', '-r', zip_path, video_dir],
-                stdout=sp.PIPE, stderr=sp.STDOUT
+            dest_dir = os.path.join(
+                self.root,
+                upload_date.strftime("%Y"),
+                upload_date.strftime("%m"),
+                dir_name,
             )
-            if r.returncode:
-                raise Error(r.stdout.decode().strip())
 
-            try:
-                fi = os.stat(zip_path)
-            except OSError as exc:
-                raise Error('could not stat zip file') from exc
+            os.makedirs(os.path.dirname(dest_dir), exist_ok=True)
 
-            dest_path_rel = os.path.relpath(zip_path, self.root)
+            shutil.rmtree(dest_dir, ignore_errors=True)
+            shutil.move(result_dir, dest_dir)
 
-            filehash = sha256sum(zip_path)
-            with open(os.path.join(self.root, SUMS_FILENAME), "a") as f:
-                f.write("{} *{}\n".format(filehash, dest_path_rel))
-                f.flush()
-                os.fsync(f.fileno())
+            files = []
+
+            for path in glob.glob(os.path.join(dest_dir, "**"), recursive=True):
+                self.logger.info("output file: %s", path)
+
+                try:
+                    fi = os.stat(path)
+                except OSError as exc:
+                    raise Error('could not stat output file') from exc
+
+                if stat.S_ISDIR(fi.st_mode):
+                    continue
+
+                filehash = sha256sum(path)
+
+                files.append({
+                    "path": os.path.relpath(path, self.root),
+                    "hash": filehash,
+                    "size": fi.st_size,
+                })
 
             redundant_keys = (
                 'formats', 'requested_formats', 'format', 'format_id', 'requested_subtitles',
@@ -285,13 +289,12 @@ class Download:
 
             result.append({
                 'id': info['id'],
-                'file': zip_path,
-                'filesize': fi.st_size,
-                'filehash': filehash,
+                'files': files,
                 'output_dir': self.output_dir,
-                'storage_path': os.path.relpath(zip_path, self.root),
                 'info': info,
             })
+
+        shutil.rmtree(self.output_dir, ignore_errors=True)
 
         return result
 
