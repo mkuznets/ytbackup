@@ -52,7 +52,6 @@ func trackProgress(ctx context.Context, cancel context.CancelFunc, path string) 
 				return
 			}
 			idle := time.Since(*last)
-			log.Info().Stringer("idle", idle).Msg("idle")
 			left := idleTimeout - idle
 			if idle >= idleTimeout {
 				log.Error().Msg("Stopping idle download")
