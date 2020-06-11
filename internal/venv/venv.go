@@ -12,6 +12,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 type VirtualEnv struct {
@@ -28,7 +30,7 @@ func New(rootDir string, opts ...Option) (*VirtualEnv, error) {
 		dir:          rootDir,
 		python:       filepath.Join(rootDir, "bin", "python"),
 		pip:          filepath.Join(rootDir, "bin", "pip"),
-		systemPython: "python",
+		systemPython: "python3",
 	}
 	for _, opt := range opts {
 		opt(venv)
@@ -48,7 +50,7 @@ func (v *VirtualEnv) init() error {
 			return fmt.Errorf("not a directory: %v", v.dir)
 		}
 
-		rctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		rctx, cancel := context.WithTimeout(ctx, 120*time.Second)
 		defer cancel()
 
 		if err := v.ensurePip(rctx); err != nil {
@@ -60,7 +62,7 @@ func (v *VirtualEnv) init() error {
 		return nil
 	}
 
-	rctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	rctx, cancel := context.WithTimeout(ctx, 300*time.Second)
 	defer cancel()
 
 	if err := v.ensurePython(rctx); err != nil {
@@ -98,10 +100,12 @@ func (v *VirtualEnv) run(ctx context.Context, input io.Reader, name string, args
 }
 
 func (v *VirtualEnv) upgrade(ctx context.Context) error {
-	if _, err := v.run(ctx, nil, v.pip, "install", "-U", "pip", "setuptools", "wheel"); err != nil {
+	if out, err := v.run(ctx, nil, v.pip, "install", "-U", "pip", "setuptools", "wheel"); err != nil {
+		log.Err(err).Bytes("output", out).Msg("Could not upgrade setuptools/wheel")
 		return err
 	}
-	if _, err := v.run(ctx, nil, v.pip, "install", "-U", "youtube-dl"); err != nil {
+	if out, err := v.run(ctx, nil, v.pip, "install", "-U", "youtube-dl"); err != nil {
+		log.Err(err).Bytes("output", out).Msg("Could not upgrade youtube")
 		return err
 	}
 	return nil
