@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -30,13 +29,11 @@ type Config struct {
 		History   bool
 		Playlists map[string]string
 	}
-	Dirs struct {
-		Cache string
-		Data  string
-		Logs  string
+	Dirs     Dirs
+	Storages []struct {
+		Path string
 	}
-	Storages []Storage
-	Youtube  struct {
+	Youtube struct {
 		OAuth OAuth `yaml:"oauth"`
 	}
 	UpdateInterval time.Duration `yaml:"update_interval"`
@@ -46,8 +43,58 @@ type Config struct {
 	Browser Browser
 }
 
-type Storage struct {
-	Path string
+type Dirs struct {
+	Cache string
+	Data  string
+}
+
+func (dirs *Dirs) Logs() string {
+	return filepath.Join(dirs.Data, "logs")
+}
+
+func (dirs *Dirs) Metadata() string {
+	return filepath.Join(dirs.Data, "metadata")
+}
+
+func (dirs *Dirs) Python() string {
+	return filepath.Join(dirs.Data, "python")
+}
+
+func (dirs *Dirs) validate() error {
+	paths := make([]string, 0, 5)
+
+	// ---
+
+	if dirs.Cache == "" {
+		dirs.Cache = filepath.Join(appdirs.Cache, "ytbackup")
+	}
+	dirs.Cache = utils.MustExpand(dirs.Cache)
+	paths = append(paths, dirs.Cache)
+
+	log.Debug().Str("path", dirs.Cache).Msgf("Cache dir")
+
+	// ---
+
+	if dirs.Data == "" {
+		dirs.Data = filepath.Join(appdirs.Data, "ytbackup")
+	}
+	dirs.Data = utils.MustExpand(dirs.Data)
+	paths = append(paths, dirs.Data, dirs.Python(), dirs.Metadata(), dirs.Logs())
+
+	log.Debug().Str("path", dirs.Data).Msgf("Data dir")
+
+	// ---
+
+	for _, path := range paths {
+		if err := os.MkdirAll(path, os.FileMode(0755)); err != nil {
+			return fmt.Errorf("could not create directory: %v", err)
+		}
+		if err := utils.IsWritableDir(path); err != nil {
+			return fmt.Errorf("directory error: %v", err)
+		}
+	}
+
+	return nil
 }
 
 type Browser struct {
@@ -87,7 +134,7 @@ func NewCredentials(token *oauth2.Token) *OAuth {
 }
 
 func (cfg *Config) Validate() error {
-	if err := cfg.validateDirs(); err != nil {
+	if err := cfg.Dirs.validate(); err != nil {
 		return err
 	}
 
@@ -104,50 +151,6 @@ func (cfg *Config) Validate() error {
 	if err := cfg.validateStorages(); err != nil {
 		return err
 	}
-	return nil
-}
-
-func (cfg *Config) validateDirs() error {
-	paths := make(map[string]string)
-
-	// ---
-
-	if cfg.Dirs.Cache == "" {
-		cfg.Dirs.Cache = filepath.Join(appdirs.Cache, "ytbackup")
-	}
-	cfg.Dirs.Cache = utils.MustExpand(cfg.Dirs.Cache)
-	paths["dirs.cache"] = cfg.Dirs.Cache
-
-	// ---
-
-	if cfg.Dirs.Data == "" {
-		cfg.Dirs.Data = filepath.Join(appdirs.Data, "ytbackup")
-	}
-	cfg.Dirs.Data = utils.MustExpand(cfg.Dirs.Data)
-	paths["dirs.data"] = cfg.Dirs.Data
-
-	// ---
-
-	if cfg.Dirs.Logs == "" {
-		cfg.Dirs.Logs = filepath.Join(appdirs.State, "ytbackup")
-	}
-	cfg.Dirs.Logs = utils.MustExpand(cfg.Dirs.Logs)
-	paths["dirs.logs"] = cfg.Dirs.Logs
-
-	// ---
-
-	for key, path := range paths {
-		if err := os.MkdirAll(path, os.FileMode(0755)); err != nil {
-			return fmt.Errorf("could not create `%s`: %v", key, err)
-		}
-		if err := utils.IsWritableDir(path); err != nil {
-			return fmt.Errorf("`%s`: %v", key, err)
-		}
-
-		purpose := strings.Title(strings.Split(key, ".")[1])
-		log.Debug().Str("path", path).Msgf("%s dir", purpose)
-	}
-
 	return nil
 }
 

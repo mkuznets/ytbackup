@@ -107,7 +107,7 @@ func (cmd *Command) Init(opts interface{}) error {
 	if err != nil {
 		return fmt.Errorf("could not open pyfs: %v", err)
 	}
-	ve, err := venv.New(filepath.Join(os.TempDir(), "ytbackup", "venv"), venv.WithFS(scriptFS))
+	ve, err := venv.New(filepath.Join(cmd.Config.Dirs.Python(), "venv"), venv.WithFS(scriptFS))
 	if err != nil {
 		return fmt.Errorf("could not initialise venv: %v", err)
 	}
@@ -123,7 +123,7 @@ func (cmd *Command) Init(opts interface{}) error {
 
 	// -------------
 
-	idx := index.New(filepath.Join(cmd.Config.Dirs.Data, "index.db"))
+	idx := index.New(filepath.Join(cmd.Config.Dirs.Metadata(), "index.db"))
 	if err := idx.Init(); err != nil {
 		return fmt.Errorf("could not initialise store: %v", err)
 	}

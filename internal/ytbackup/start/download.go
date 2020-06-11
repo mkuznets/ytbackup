@@ -104,7 +104,7 @@ func (cmd *Command) downloadByID(videoID, root string) ([]*Result, error) {
 	cacheDir := cmd.Config.Dirs.Cache
 
 	logPath := filepath.Join(
-		cmd.Config.Dirs.Logs,
+		cmd.Config.Dirs.Logs(),
 		fmt.Sprintf("%s_%s.log", time.Now().Format("2006-01-02T15-04-05"), videoID),
 	)
 
