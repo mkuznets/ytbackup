@@ -31,18 +31,21 @@ func (cmd *Command) Serve(ctx context.Context) error {
 			return nil
 		}
 
-		storage, err := cmd.Storages.Get()
-		if err != nil {
-			log.Err(err).Msg("could not find a suitable storage")
-			time.Sleep(time.Minute)
-			continue
-		}
 		videos, err := cmd.Index.Pop(1)
 		if err != nil {
 			log.Err(err).Msg("index: Pop error")
 			continue
 		}
-		cmd.fetchNew(videos, storage)
+
+		if len(videos) > 0 {
+			storage, err := cmd.Storages.Get()
+			if err != nil {
+				log.Err(err).Msg("could not find a suitable storage")
+				time.Sleep(time.Minute)
+				continue
+			}
+			cmd.fetchNew(videos, storage)
+		}
 
 		if ctx.Err() == nil {
 			time.Sleep(5 * time.Second)
