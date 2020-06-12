@@ -14,7 +14,7 @@ type ExportCommand struct {
 func (cmd *ExportCommand) Execute([]string) error {
 	items := make([]*index.Video, 0)
 
-	err := cmd.Index.ListDone(func(video *index.Video) error {
+	err := cmd.Index.Map(index.StatusDone, func(video *index.Video) error {
 		items = append(items, video)
 		return nil
 	})

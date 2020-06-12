@@ -1,8 +1,10 @@
 package index
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -14,13 +16,11 @@ import (
 )
 
 var (
-	maxAttempts      = 3
-	retryDelay       = 30 * time.Second
-	bucketNew        = []byte("NEW")
-	bucketInProgress = []byte("INPROGRESS")
-	bucketDone       = []byte("DONE")
-	bucketFailed     = []byte("FAILED")
-	allBuckets       = [4][]byte{bucketNew, bucketInProgress, bucketDone, bucketFailed}
+	maxAttempts    = 3
+	retryDelay     = 30 * time.Second
+	bucketItems    = []byte("items")
+	bucketStatuses = []byte("statuses")
+	ErrStop        = errors.New("map stop")
 )
 
 type RetryMode uint8
@@ -59,7 +59,7 @@ func (st *Index) Init() error {
 	}
 
 	err = db.Update(func(tx *bolt.Tx) error {
-		for _, name := range allBuckets {
+		for _, name := range [2][]byte{bucketItems, bucketStatuses} {
 			_, err := tx.CreateBucketIfNotExists(name)
 			if err != nil {
 				return fmt.Errorf("create bucket: %s", err)
@@ -101,17 +101,14 @@ func (st *Index) Push(ids []string) (int, error) {
 	total := 0
 
 	err := st.db.Update(func(tx *bolt.Tx) error {
-	IDS:
 		for _, id := range ids {
-			for _, name := range allBuckets {
-				if tx.Bucket(name).Get([]byte(id)) != nil {
-					continue IDS
-				}
-			}
-			if err := put(tx, bucketNew, &Video{ID: id}); err != nil {
+			ok, err := put(tx, &Video{ID: id, Status: StatusNew}, false)
+			if err != nil {
 				return err
 			}
-			total++
+			if ok {
+				total++
+			}
 		}
 		return nil
 	})
@@ -123,45 +120,30 @@ func (st *Index) Pop(n int) ([]*Video, error) {
 	items := make([]*Video, 0, n)
 
 	err := st.db.Update(func(tx *bolt.Tx) error {
-		bNew := tx.Bucket(bucketNew)
-
-		c := bNew.Cursor()
 		i := 0
 
-		for key, value := c.First(); key != nil && i < n; key, value = c.Next() {
-			var video Video
-			if err := json.Unmarshal(value, &video); err != nil {
-				return err
-			}
-
+		return mapItems(tx, StatusNew, func(video *Video) error {
 			if video.RetryAfter != nil && video.RetryAfter.After(time.Now()) {
-				continue
-			}
-
-			if err := bNew.Delete(key); err != nil {
-				return err
-			}
-
-			if video.Attempt > maxAttempts {
-				log.Info().Str("id", video.ID).Msg("Retry limit reached")
-				if err := put(tx, bucketFailed, &video); err != nil {
-					return err
-				}
-				continue
+				return nil
 			}
 
 			deadline := time.Now().Add(st.timeout)
 			video.Deadline = &deadline
+			video.Status = StatusInProgress
 
-			if err := put(tx, bucketInProgress, &video); err != nil {
+			_, err := put(tx, video, true)
+			if err != nil {
 				return err
 			}
 
-			items = append(items, &video)
+			items = append(items, video)
 			i++
-		}
+			if i >= n {
+				return ErrStop
+			}
 
-		return nil
+			return nil
+		})
 	})
 	if err != nil {
 		return nil, err
@@ -174,8 +156,7 @@ func (st *Index) Retry(id string, mode RetryMode) error {
 	log.Info().Str("id", id).Msg("Retry later")
 
 	return st.db.Update(func(tx *bolt.Tx) error {
-		key := []byte(id)
-		value := tx.Bucket(bucketInProgress).Get(key)
+		value := tx.Bucket(bucketItems).Get([]byte(id))
 		if value == nil {
 			return nil
 		}
@@ -185,17 +166,20 @@ func (st *Index) Retry(id string, mode RetryMode) error {
 			return err
 		}
 
+		video.Status = StatusNew
+
 		if mode == RetryLimited {
 			video.Attempt++
+			after := time.Now().Add(retryDelay)
+			video.RetryAfter = &after
+
+			if video.Attempt > maxAttempts {
+				log.Info().Str("id", video.ID).Msg("Retry limit reached")
+				video.Status = StatusFailed
+			}
 		}
 
-		after := time.Now().Add(retryDelay)
-		video.RetryAfter = &after
-
-		if err := tx.Bucket(bucketInProgress).Delete(key); err != nil {
-			return err
-		}
-		if err := put(tx, bucketNew, &video); err != nil {
+		if _, err := put(tx, &video, true); err != nil {
 			return err
 		}
 
@@ -207,29 +191,18 @@ func (st *Index) Done(video *Video) error {
 	return st.db.Update(func(tx *bolt.Tx) error {
 		v := *video
 		v.Deadline = nil
-
-		if err := put(tx, bucketDone, &v); err != nil {
+		v.Status = StatusDone
+		if _, err := put(tx, &v, true); err != nil {
 			return err
 		}
-
-		for _, name := range [2][]byte{bucketNew, bucketInProgress} {
-			if err := tx.Bucket(name).Delete(video.Key()); err != nil {
-				return err
-			}
-		}
-
 		return nil
 	})
 }
 
-func (st *Index) ListDone(f func(*Video) error) error {
+func (st *Index) Map(status Status, f func(*Video) error) error {
 	return st.db.View(func(tx *bolt.Tx) error {
-		return tx.Bucket(bucketDone).ForEach(func(key, value []byte) error {
-			var video Video
-			if err := json.Unmarshal(value, &video); err != nil {
-				return err
-			}
-			if err := f(&video); err != nil {
+		return mapItems(tx, status, func(video *Video) error {
+			if err := f(video); err != nil {
 				return fmt.Errorf("list callback: %v", err)
 			}
 			return nil
@@ -254,44 +227,137 @@ func (st *Index) ensureTimeout(ctx context.Context) {
 
 func (st *Index) ensureTimeoutOnce() error {
 	return st.db.Update(func(tx *bolt.Tx) error {
-		bInProgress := tx.Bucket(bucketInProgress)
-
-		return bInProgress.ForEach(func(key, value []byte) error {
-			var video Video
-
-			if err := json.Unmarshal(value, &video); err != nil {
-				return fmt.Errorf("could not unmarshal key %s in %s: %v", key, bucketInProgress, err)
-			}
-
+		return mapItems(tx, StatusInProgress, func(video *Video) error {
 			if video.Deadline == nil {
 				log.Error().
-					Bytes("id", key).
-					Bytes("bucket", bucketInProgress).
+					Str("id", video.ID).
+					Str("status", string(StatusInProgress)).
 					Msg("Video does not have a deadline")
 				return nil
 			}
-
 			if video.Deadline.Before(time.Now()) {
-				log.Warn().Bytes("id", key).Msg("Download timed out, retrying")
+				log.Debug().Str("id", video.ID).Msg("Download timed out, retrying")
 				video.Deadline = nil
+				video.Status = StatusNew
 
-				if err := put(tx, bucketNew, &video); err != nil {
-					return err
-				}
-				if err := bInProgress.Delete(key); err != nil {
+				if _, err := put(tx, video, true); err != nil {
 					return err
 				}
 			}
-
 			return nil
 		})
 	})
 }
 
-func put(tx *bolt.Tx, bucket []byte, video *Video) error {
+func (st *Index) Check() error {
+	items := make(map[string]*Video)
+	statusIDs := make(map[string]string)
+
+	return st.db.View(func(tx *bolt.Tx) error {
+		err := tx.Bucket(bucketItems).ForEach(func(k, v []byte) error {
+			var video Video
+			if err := json.Unmarshal(v, &video); err != nil {
+				return err
+			}
+			if !bytes.Equal(video.Key(), k) {
+				return fmt.Errorf("invalid item key: [%q] = Video{ID: %q}", k, video.ID)
+			}
+			items[video.ID] = &video
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+
+		err = tx.Bucket(bucketStatuses).ForEach(func(k, v []byte) error {
+			ps := bytes.Split(k, []byte("::"))
+			if len(ps) != 2 {
+				return fmt.Errorf("invalid status key: %q", k)
+			}
+			status, id := ps[0], ps[1]
+			if !bytes.Equal(id, v) {
+				return fmt.Errorf("invalid status value: [%q] = %q", k, v)
+			}
+
+			st, ok := statusIDs[string(v)]
+			if ok {
+				return fmt.Errorf("multiple statuses for id=%q: %s and %s", id, st, status)
+			}
+			statusIDs[string(v)] = string(status)
+
+			video, ok := items[string(v)]
+			if !ok {
+				return fmt.Errorf("missing item for status %s", k)
+			}
+
+			if string(video.Status) != string(status) {
+				return fmt.Errorf("status mismatch: %q vs Video{ID: %q, Status: %q}", k, video.ID, video.Status)
+			}
+
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func put(tx *bolt.Tx, video *Video, replace bool) (ok bool, err error) {
+	if video.Status == "" {
+		panic(".Status is required")
+	}
+
+	oldItem := tx.Bucket(bucketItems).Get(video.Key())
+	if oldItem != nil {
+		if !replace {
+			return false, nil
+		}
+
+		var oldVideo Video
+		if err := json.Unmarshal(oldItem, &oldVideo); err != nil {
+			return false, fmt.Errorf("could not unmarshal key %s: %v", video.Key(), err)
+		}
+		if err := tx.Bucket(bucketStatuses).Delete(oldVideo.StatusKey()); err != nil {
+			return false, err
+		}
+	}
+
 	value, err := json.Marshal(video)
 	if err != nil {
-		return fmt.Errorf("could not serialise Video: %v", err)
+		return false, fmt.Errorf("could not serialise Video: %v", err)
 	}
-	return tx.Bucket(bucket).Put(video.Key(), value)
+
+	if err := tx.Bucket(bucketItems).Put(video.Key(), value); err != nil {
+		return false, err
+	}
+	if err := tx.Bucket(bucketStatuses).Put(video.StatusKey(), video.Key()); err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+func mapItems(tx *bolt.Tx, status Status, f func(*Video) error) error {
+	cur := tx.Bucket(bucketStatuses).Cursor()
+	prefix := []byte(status)
+
+	for key, videoID := cur.Seek(prefix); key != nil && bytes.HasPrefix(key, prefix); key, videoID = cur.Next() {
+		data := tx.Bucket(bucketItems).Get(videoID)
+		if data == nil {
+			return fmt.Errorf("inconsistent index: %s", videoID)
+		}
+		var video Video
+		if err := json.Unmarshal(data, &video); err != nil {
+			return err
+		}
+		if err := f(&video); err != nil {
+			if errors.Is(err, ErrStop) {
+				return nil
+			}
+			return err
+		}
+	}
+
+	return nil
 }

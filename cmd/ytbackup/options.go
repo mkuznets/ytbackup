@@ -11,4 +11,5 @@ type Options struct {
 	Setup  *ytbackup.SetupCommand  `command:"setup" description:""`
 	Import *ytbackup.ImportCommand `command:"import" description:"retrieve videos from Google's takeout JSON files"`
 	Export *ytbackup.ExportCommand `command:"export" description:""`
+	Check  *ytbackup.CheckCommand  `command:"check"`
 }
