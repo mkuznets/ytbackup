@@ -34,7 +34,7 @@ class YDLOpts:
         'call_home': False,
         'ignoreerrors': False,
         'geo_bypass': True,
-        'verbose': True,
+        'verbose': False,
         'prefer_ffmpeg': True,
     }
     download = {
