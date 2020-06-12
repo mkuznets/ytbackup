@@ -5,20 +5,34 @@ import (
 	"time"
 )
 
-func RunEveryInterval(ctx context.Context, interval time.Duration, fun func()) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+func RunEveryInterval(ctx context.Context, interval time.Duration, fun func() error) error {
+	if err := fun(); err != nil {
+		return err
+	}
 
-	fun()
+	timer := time.NewTimer(interval)
+	defer func() {
+		if !timer.Stop() {
+			<-timer.C
+		}
+	}()
+
 	for {
 		select {
 		case <-ctx.Done():
-			return
-		case <-ticker.C:
+			return nil
+
+		case <-timer.C:
 			if ctx.Err() != nil {
-				return
+				timer.Reset(interval)
+				return nil
 			}
-			fun()
+
+			if err := fun(); err != nil {
+				return err
+			}
+
+			timer.Reset(interval)
 		}
 	}
 }

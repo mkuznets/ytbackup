@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"mkuznets.com/go/ytbackup/internal/index"
 	"mkuznets.com/go/ytbackup/internal/storages"
+	"mkuznets.com/go/ytbackup/internal/utils"
 	"mkuznets.com/go/ytbackup/internal/venv"
 )
 
@@ -26,31 +27,24 @@ type Result struct {
 }
 
 func (cmd *Command) Serve(ctx context.Context) error {
-	for {
-		if ctx.Err() != nil {
-			return nil
-		}
-
+	return utils.RunEveryInterval(ctx, 5*time.Second, func() error {
 		videos, err := cmd.Index.Pop(1)
 		if err != nil {
 			log.Err(err).Msg("index: Pop error")
-			continue
+			return nil
 		}
 
 		if len(videos) > 0 {
 			storage, err := cmd.Storages.Get()
 			if err != nil {
 				log.Err(err).Msg("could not find a suitable storage")
-				time.Sleep(time.Minute)
-				continue
+				time.Sleep(2 * time.Minute)
+				return nil
 			}
 			cmd.fetchNew(videos, storage)
 		}
-
-		if ctx.Err() == nil {
-			time.Sleep(5 * time.Second)
-		}
-	}
+		return nil
+	})
 }
 
 func (cmd *Command) fetchNew(videos []*index.Video, storage *storages.Ready) {
