@@ -2,15 +2,23 @@ package start
 
 import (
 	"github.com/rs/zerolog/log"
+	"mkuznets.com/go/ytbackup/internal/python"
 	"mkuznets.com/go/ytbackup/internal/ytbackup"
 )
 
 type Command struct {
 	DisableDownload bool `long:"disable-download" description:"do not download new videos" env:"YTBACKUP_DISABLE_DOWNLOAD"`
 	ytbackup.Command
+	Python *python.Python
 }
 
 func (cmd *Command) Execute([]string) error {
+	cmd.Python = python.New(cmd.Config.Dirs.Python(), python.WithPython("python3"))
+	if err := cmd.Python.Init(cmd.Ctx); err != nil {
+		return err
+	}
+	defer cmd.Python.Close()
+
 	if cmd.Config.Sources.History {
 		cmd.Wg.Add(1)
 		go func() {
@@ -52,5 +60,8 @@ func (cmd *Command) Execute([]string) error {
 		return nil
 	}
 	log.Warn().Msg("Downloader is disabled")
+
+	cmd.Wg.Wait()
+
 	return nil
 }

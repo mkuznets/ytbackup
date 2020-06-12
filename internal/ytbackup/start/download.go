@@ -9,9 +9,9 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"mkuznets.com/go/ytbackup/internal/index"
+	"mkuznets.com/go/ytbackup/internal/python"
 	"mkuznets.com/go/ytbackup/internal/storages"
 	"mkuznets.com/go/ytbackup/internal/utils"
-	"mkuznets.com/go/ytbackup/internal/venv"
 )
 
 const (
@@ -103,20 +103,17 @@ func (cmd *Command) downloadByID(videoID, root string) ([]*Result, error) {
 	)
 
 	cargs := []string{
-		"/dl.py",
+		"dl.py",
 		"--log=" + logPath,
 		"download",
 		"--root=" + root,
 		"--cache=" + cacheDir,
 		url,
 	}
-
-	log.Debug().Strs("args", cargs).Msg("Running python")
-
 	go trackProgress(rctx, cancel, logPath)
 
 	var result []*Result
-	if err := cmd.Venv.RunScript(rctx, &result, cargs...); err != nil {
+	if err := cmd.Python.RunScript(rctx, &result, cargs...); err != nil {
 		return nil, err
 	}
 
@@ -124,7 +121,7 @@ func (cmd *Command) downloadByID(videoID, root string) ([]*Result, error) {
 }
 
 func isNetworkError(err error) bool {
-	if e, ok := err.(*venv.ScriptError); ok && e.Reason == "network" {
+	if e, ok := err.(*python.ScriptError); ok && e.Reason == "network" {
 		return true
 	}
 	return false

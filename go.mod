@@ -6,8 +6,10 @@ require (
 	cloud.google.com/go v0.53.0 // indirect
 	github.com/chromedp/cdproto v0.0.0-20200424080200-0de008e41fa0
 	github.com/chromedp/chromedp v0.5.3
+	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-pkgz/repeater v1.1.3
 	github.com/gofrs/uuid v3.3.0+incompatible
+	github.com/hashicorp/go-version v1.2.0
 	github.com/hpcloud/tail v1.0.0
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/joho/godotenv v1.3.0

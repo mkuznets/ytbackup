@@ -10,14 +10,11 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/rakyll/statik/fs"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"mkuznets.com/go/ytbackup/internal/config"
 	"mkuznets.com/go/ytbackup/internal/index"
-	"mkuznets.com/go/ytbackup/internal/pyfs"
 	"mkuznets.com/go/ytbackup/internal/storages"
-	"mkuznets.com/go/ytbackup/internal/venv"
 )
 
 // Options is a group of common options for all subcommands.
@@ -31,7 +28,6 @@ type Command struct {
 	DB       *sql.DB
 	Index    *index.Index
 	Storages *storages.Storages
-	Venv     *venv.VirtualEnv
 	Config   *Config
 	Wg       *sync.WaitGroup
 	Ctx      context.Context
@@ -100,18 +96,6 @@ func (cmd *Command) Init(opts interface{}) error {
 	}
 
 	cmd.Config = &cfg
-
-	// -------------
-
-	scriptFS, err := fs.NewWithNamespace(pyfs.Python)
-	if err != nil {
-		return fmt.Errorf("could not open pyfs: %v", err)
-	}
-	ve, err := venv.New(filepath.Join(cmd.Config.Dirs.Python(), "venv"), venv.WithFS(scriptFS))
-	if err != nil {
-		return fmt.Errorf("could not initialise venv: %v", err)
-	}
-	cmd.Venv = ve
 
 	// -------------
 

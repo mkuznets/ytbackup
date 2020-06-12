@@ -1,14 +1,34 @@
-package venv
+package python
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
+
+	"github.com/rs/zerolog/log"
 )
 
 const knownErrorCode = 0xE7
+
+func (py *Python) run(ctx context.Context, input io.Reader, args ...string) ([]byte, error) {
+	py.runLock.Lock()
+	defer py.runLock.Unlock()
+
+	log.Debug().Str("executable", py.executable).Strs("args", args).Msg("Running python")
+
+	c := exec.CommandContext(ctx, py.executable, args...) // nolint
+	c.Dir = py.root
+	c.Env = append(os.Environ(), fmt.Sprintf("PYTHONPATH=%s", py.root))
+
+	if input != nil {
+		c.Stdin = input
+	}
+	return c.CombinedOutput()
+}
 
 type ScriptError struct {
 	ErrorText string `json:"error"`
@@ -19,22 +39,12 @@ func (se *ScriptError) Error() string {
 	return se.ErrorText
 }
 
-func (v *VirtualEnv) RunScript(ctx context.Context, result interface{}, args ...string) error {
+func (py *Python) RunScript(ctx context.Context, result interface{}, args ...string) error {
 	if len(args) < 1 {
 		panic("expected at least one argument")
 	}
-	if v.fs == nil {
-		return errors.New("scripts filesystem is not configured")
-	}
 
-	f, err := v.fs.Open(args[0])
-	if err != nil {
-		return fmt.Errorf("%s: %v", args[0], err)
-	}
-
-	cargs := append([]string{"-"}, args[1:]...)
-	out, err := v.run(ctx, f, v.python, cargs...)
-
+	out, err := py.run(ctx, nil, args...)
 	if err != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return fmt.Errorf("timeout exceeded")
