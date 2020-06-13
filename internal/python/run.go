@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"syscall"
 
 	"github.com/rs/zerolog/log"
 )
@@ -17,6 +18,8 @@ func (py *Python) run(ctx context.Context, args ...string) ([]byte, error) {
 	log.Debug().Str("executable", py.executable).Strs("args", args).Msg("Running python")
 
 	c := exec.CommandContext(ctx, py.executable, args...) // nolint
+	c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
+
 	c.Dir = py.root
 	c.Env = append(os.Environ(), fmt.Sprintf("PYTHONPATH=%s", py.root))
 	return c.CombinedOutput()

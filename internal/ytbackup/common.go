@@ -25,12 +25,13 @@ type Options struct {
 
 // Command is a common part of all subcommands.
 type Command struct {
-	DB       *sql.DB
-	Index    *index.Index
-	Storages *storages.Storages
-	Config   *Config
-	Wg       *sync.WaitGroup
-	Ctx      context.Context
+	DB          *sql.DB
+	Index       *index.Index
+	Storages    *storages.Storages
+	Config      *Config
+	Wg          *sync.WaitGroup
+	Ctx         context.Context
+	CriticalCtx context.Context
 }
 
 func (cmd *Command) Init(opts interface{}) error {
@@ -43,6 +44,10 @@ func (cmd *Command) Init(opts interface{}) error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cmd.Ctx = ctx
+
+	critCtx, critCancel := context.WithCancel(context.Background())
+	cmd.CriticalCtx = critCtx
+
 	cmd.Wg = &sync.WaitGroup{}
 
 	signalChan := make(chan os.Signal, 1)
@@ -53,14 +58,16 @@ func (cmd *Command) Init(opts interface{}) error {
 	go func() {
 		cnt := 0
 		for s := range signalChan {
+			slog := log.Warn().Stringer("signal", s)
 			switch cnt {
 			case 0:
-				log.Warn().Stringer("signal", s).Msgf("Graceful termination")
+				slog.Msgf("Graceful termination")
 				cancel()
 			case 1:
-				log.Warn().Msgf("Send one more signal for hard termination")
+				slog.Msgf("Send one more for hard termination")
+				critCancel()
 			case 2:
-				log.Warn().Msgf("Hard termination")
+				slog.Msgf("Hard termination")
 				os.Exit(1)
 			}
 			cnt++

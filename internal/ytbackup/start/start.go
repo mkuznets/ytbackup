@@ -23,7 +23,7 @@ func (cmd *Command) Execute([]string) error {
 		python.WithYDLVersion(pyConf.YoutubeDL.Version),
 	)
 
-	if err := cmd.Python.Init(cmd.Ctx); err != nil {
+	if err := cmd.Python.Init(cmd.CriticalCtx); err != nil {
 		return err
 	}
 	defer cmd.Python.Close()

@@ -88,9 +88,7 @@ func (cmd *Command) fetchNew(videos []*index.Video, storage *storages.Ready) {
 }
 
 func (cmd *Command) downloadByID(videoID, root string) ([]*Result, error) {
-	// cmd.Ctx is not used here because it is cancelled on graceful termination.
-	// Instead, we want the last download to finish and only then terminate the downloader.
-	rctx, cancel := context.WithCancel(context.Background())
+	rctx, cancel := context.WithCancel(cmd.CriticalCtx)
 	defer cancel()
 
 	url := fmt.Sprintf(ytVideoURLFormat, videoID)
