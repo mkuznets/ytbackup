@@ -1,11 +1,11 @@
 package main
 
 import (
-	"log"
 	"os"
 
 	"github.com/jessevdk/go-flags"
 	"github.com/joho/godotenv"
+	"github.com/rs/zerolog/log"
 )
 
 type Commander interface {
@@ -15,9 +15,6 @@ type Commander interface {
 }
 
 func main() {
-	log.SetFlags(0)
-	log.SetOutput(os.Stdout)
-
 	_ = godotenv.Load()
 
 	var opts Options
@@ -25,13 +22,18 @@ func main() {
 
 	parser.CommandHandler = func(command flags.Commander, args []string) error {
 		c := command.(Commander)
+
 		if err := c.Init(opts.Common); err != nil {
-			return err
+			log.Fatal().Msg(err.Error())
+			return nil
 		}
 		defer c.Close()
+
 		if err := c.Execute(args); err != nil {
-			return err
+			log.Fatal().Msg(err.Error())
+			return nil
 		}
+
 		return nil
 	}
 
