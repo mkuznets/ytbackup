@@ -11,14 +11,13 @@ import json
 import logging
 import os
 import shutil
-import socket
 import stat
 import sys
 import typing
 import urllib.error
 from unittest import mock
 
-NETWORK_EXCS = (urllib.error.URLError, http.client.HTTPException, socket.error)
+SYSTEM_EXCS = (urllib.error.URLError, http.client.HTTPException, OSError)
 
 STDERR = sys.stderr
 
@@ -232,8 +231,8 @@ class Download:
             with mock.patch.object(ydl, 'process_info', process_hook):
                 ydl.download(self.urls)
         except youtube_dl.DownloadError as exc:
-            if exc.exc_info[0] in NETWORK_EXCS:
-                raise Error('network unavailable', reason='network') from exc
+            if exc.exc_info[0] in SYSTEM_EXCS:
+                raise Error(str(exc), reason='system') from exc
             raise
 
         result = []

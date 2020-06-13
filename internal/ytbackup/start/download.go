@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	networkDowntime  = time.Minute
-	ytVideoURLFormat = "https://www.youtube.com/watch?v=%s"
+	systemErrorDowntime = 2 * time.Minute
+	ytVideoURLFormat    = "https://www.youtube.com/watch?v=%s"
 )
 
 type Result struct {
@@ -53,14 +53,15 @@ func (cmd *Command) fetchNew(videos []*index.Video, storage *storages.Ready) {
 
 		results, err := cmd.downloadByID(video.ID, storage.Path)
 		if err != nil {
-			if isNetworkError(err) {
-				log.Warn().Msgf("Network is down, sleeping for %s", networkDowntime)
+			log.Err(err).Str("id", video.ID).Msg("Download error")
+
+			if isSystemError(err) {
+				log.Warn().Msgf("System error, sleeping for %s", systemErrorDowntime)
 				_ = cmd.Index.Retry(video.ID, index.RetryInfinite)
-				time.Sleep(networkDowntime)
+				time.Sleep(systemErrorDowntime)
 				continue
 			}
 
-			log.Err(err).Str("id", video.ID).Msg("Download error")
 			_ = cmd.Index.Retry(video.ID, index.RetryLimited)
 			continue
 		}
@@ -118,8 +119,8 @@ func (cmd *Command) downloadByID(videoID, root string) ([]*Result, error) {
 	return result, nil
 }
 
-func isNetworkError(err error) bool {
-	if e, ok := err.(*python.ScriptError); ok && e.Reason == "network" {
+func isSystemError(err error) bool {
+	if e, ok := err.(*python.ScriptError); ok && e.Reason == "system" {
 		return true
 	}
 	return false
