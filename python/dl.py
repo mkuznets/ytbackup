@@ -26,6 +26,7 @@ STDERR = sys.stderr
 
 class YDLOpts:
     common = {
+        'buffersize': 16 * 1024,
         'quiet': True,
         'noprogress': True,
         'youtube_include_dash_manifest': True,
