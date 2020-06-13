@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 
@@ -14,19 +13,12 @@ import (
 
 const knownErrorCode = 0xE7
 
-func (py *Python) run(ctx context.Context, input io.Reader, args ...string) ([]byte, error) {
-	py.runLock.Lock()
-	defer py.runLock.Unlock()
-
+func (py *Python) run(ctx context.Context, args ...string) ([]byte, error) {
 	log.Debug().Str("executable", py.executable).Strs("args", args).Msg("Running python")
 
 	c := exec.CommandContext(ctx, py.executable, args...) // nolint
 	c.Dir = py.root
 	c.Env = append(os.Environ(), fmt.Sprintf("PYTHONPATH=%s", py.root))
-
-	if input != nil {
-		c.Stdin = input
-	}
 	return c.CombinedOutput()
 }
 
@@ -40,11 +32,14 @@ func (se *ScriptError) Error() string {
 }
 
 func (py *Python) RunScript(ctx context.Context, result interface{}, args ...string) error {
+	py.runLock.Lock()
+	defer py.runLock.Unlock()
+
 	if len(args) < 1 {
 		panic("expected at least one argument")
 	}
 
-	out, err := py.run(ctx, nil, args...)
+	out, err := py.run(ctx, args...)
 	if err != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return fmt.Errorf("timeout exceeded")

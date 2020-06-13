@@ -47,3 +47,18 @@ func MustExpand(path string) string {
 	}
 	return absPath
 }
+
+func RemoveDirs(root string) error {
+	files, err := ioutil.ReadDir(root)
+	if err != nil {
+		return err
+	}
+	for _, fi := range files {
+		if fi.IsDir() {
+			if err := os.RemoveAll(filepath.Join(root, fi.Name())); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}

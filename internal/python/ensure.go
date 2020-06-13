@@ -15,7 +15,7 @@ import (
 )
 
 func (py *Python) ensurePython(ctx context.Context) error {
-	out, err := py.run(ctx, nil, "-V")
+	out, err := py.run(ctx, "-V")
 	if err != nil {
 		return fmt.Errorf("could not run python: %v", err)
 	}
@@ -78,11 +78,30 @@ func (py *Python) ensureScriptFS() error {
 }
 
 func (py *Python) ensurePyCache(ctx context.Context) error {
-	_ = os.RemoveAll(filepath.Join(py.root, "__pycache__"))
+	cacheDirs := make([]string, 0)
+
+	err := filepath.Walk(py.root, func(path string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if fi.IsDir() && fi.Name() == "__pycache__" {
+			cacheDirs = append(cacheDirs, path)
+		}
+		return nil
+	})
+	if err != nil {
+		log.Warn().Err(err).Msg("python cache cleanup error")
+		return nil
+	}
+	for _, path := range cacheDirs {
+		if err := os.RemoveAll(path); err != nil {
+			log.Warn().Err(err).Msg("python cache cleanup error")
+		}
+	}
 
 	log.Debug().Msg("Pre-compiling Python scripts")
 
-	_, err := py.run(ctx, nil, "-c", `import compileall; compileall.compile_dir(".")`)
+	_, err = py.run(ctx, "-c", `import compileall; compileall.compile_dir(".")`)
 	if err != nil {
 		return fmt.Errorf("could not create pycache: %v", err)
 	}

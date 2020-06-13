@@ -13,9 +13,14 @@ type Command struct {
 }
 
 func (cmd *Command) Execute([]string) error {
+	pyConf := &cmd.Config.Python
+
 	cmd.Python = python.New(
 		cmd.Config.Dirs.Python(),
-		python.WithPython(cmd.Config.Python.Executable),
+		python.WithPython(pyConf.Executable),
+		python.WithYDLUpdateInterval(pyConf.YoutubeDL.UpdateInterval),
+		python.WithYDLLite(pyConf.YoutubeDL.Lite),
+		python.WithYDLVersion(pyConf.YoutubeDL.Version),
 	)
 
 	if err := cmd.Python.Init(cmd.Ctx); err != nil {

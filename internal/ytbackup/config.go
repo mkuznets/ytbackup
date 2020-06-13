@@ -16,12 +16,17 @@ import (
 )
 
 const ConfigDefaults = `
-python:
-  executable: python
 browser:
   executable: chromium
   debug_port: 9222
 update_interval: 5m
+
+python:
+  executable: python3
+  youtube-dl:
+    update_interval: 3h
+    version: latest
+    lite: false
 `
 
 type Config struct {
@@ -39,6 +44,11 @@ type Config struct {
 	UpdateInterval time.Duration `yaml:"update_interval"`
 	Python         struct {
 		Executable string `yaml:"executable"`
+		YoutubeDL  struct {
+			Lite           bool
+			Version        string
+			UpdateInterval time.Duration `yaml:"update_interval"`
+		} `yaml:"youtube-dl"`
 	}
 	Browser Browser
 }
