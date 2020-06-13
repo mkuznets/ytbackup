@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -49,4 +50,15 @@ func SleepContext(ctx context.Context, d time.Duration) {
 		timer.Stop()
 		return
 	}
+}
+
+func FormatDuration(seconds int) string {
+	d := time.Duration(seconds) * time.Second
+	d = d.Round(time.Second)
+	h := d / time.Hour
+	d -= h * time.Hour
+	m := d / time.Minute
+	d -= m * time.Minute
+	s := d / time.Second
+	return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
 }
