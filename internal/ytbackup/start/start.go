@@ -13,7 +13,11 @@ type Command struct {
 }
 
 func (cmd *Command) Execute([]string) error {
-	cmd.Python = python.New(cmd.Config.Dirs.Python(), python.WithPython("python3"))
+	cmd.Python = python.New(
+		cmd.Config.Dirs.Python(),
+		python.WithPython(cmd.Config.Python.Executable),
+	)
+
 	if err := cmd.Python.Init(cmd.Ctx); err != nil {
 		return err
 	}
