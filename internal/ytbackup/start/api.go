@@ -16,7 +16,7 @@ func (cmd *Command) crawlAPI(ctx context.Context) error {
 		return err
 	}
 
-	return utils.RunEveryInterval(ctx, cmd.Config.UpdateInterval, func() error {
+	return utils.RunEveryInterval(ctx, cmd.Config.Sources.UpdateInterval, func() error {
 		log.Debug().Msg("Playlists: checking for new videos")
 
 		for title, playlistID := range cmd.Config.Sources.Playlists {

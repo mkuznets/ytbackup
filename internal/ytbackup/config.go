@@ -16,10 +16,12 @@ import (
 )
 
 const ConfigDefaults = `
+sources:
+  update_interval: 5m
+
 browser:
   executable: chromium
   debug_port: 9222
-update_interval: 5m
 
 python:
   executable: python3
@@ -31,8 +33,9 @@ python:
 
 type Config struct {
 	Sources struct {
-		History   bool
-		Playlists map[string]string
+		History        bool
+		Playlists      map[string]string
+		UpdateInterval time.Duration `yaml:"update_interval"`
 	}
 	Dirs     Dirs
 	Storages []struct {
@@ -41,8 +44,7 @@ type Config struct {
 	Youtube struct {
 		OAuth OAuth `yaml:"oauth"`
 	}
-	UpdateInterval time.Duration `yaml:"update_interval"`
-	Python         struct {
+	Python struct {
 		Executable string `yaml:"executable"`
 		YoutubeDL  struct {
 			Lite           bool

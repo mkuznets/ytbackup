@@ -14,7 +14,7 @@ func (cmd *Command) crawlHistory(ctx context.Context) error {
 		return err
 	}
 
-	return utils.RunEveryInterval(ctx, cmd.Config.UpdateInterval, func() error {
+	return utils.RunEveryInterval(ctx, cmd.Config.Sources.UpdateInterval, func() error {
 		log.Debug().Msg("Watch history: checking for new videos")
 
 		err := bro.Do(ctx, func(ctx context.Context, url string) error {

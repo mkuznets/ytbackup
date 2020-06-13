@@ -33,7 +33,7 @@ func (cmd *Command) Execute([]string) error {
 		go func() {
 			defer cmd.Wg.Done()
 			log.Info().
-				Stringer("interval", cmd.Config.UpdateInterval).
+				Stringer("interval", cmd.Config.Sources.UpdateInterval).
 				Msg("Watch history crawler: starting")
 
 			if err := cmd.crawlHistory(cmd.Ctx); err != nil {
@@ -49,7 +49,7 @@ func (cmd *Command) Execute([]string) error {
 		go func() {
 			defer cmd.Wg.Done()
 			log.Info().
-				Stringer("interval", cmd.Config.UpdateInterval).
+				Stringer("interval", cmd.Config.Sources.UpdateInterval).
 				Msg("Playlists crawler: starting")
 
 			if err := cmd.crawlAPI(cmd.Ctx); err != nil {
