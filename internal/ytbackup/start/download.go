@@ -37,17 +37,17 @@ func (cmd *Command) Serve(ctx context.Context) error {
 		if len(videos) > 0 {
 			storage, err := cmd.Storages.Get()
 			if err != nil {
-				log.Err(err).Msg("could not find a suitable storage")
-				time.Sleep(2 * time.Minute)
+				log.Err(err).Msgf("no suitable storage, sleeping for %s", systemErrorDowntime)
+				utils.SleepContext(ctx, systemErrorDowntime)
 				return nil
 			}
-			cmd.fetchNew(videos, storage)
+			cmd.fetchNew(ctx, videos, storage)
 		}
 		return nil
 	})
 }
 
-func (cmd *Command) fetchNew(videos []*index.Video, storage *storages.Ready) {
+func (cmd *Command) fetchNew(ctx context.Context, videos []*index.Video, storage *storages.Ready) {
 	for _, video := range videos {
 		log.Info().Str("id", video.ID).Msg("Downloading")
 
@@ -58,7 +58,7 @@ func (cmd *Command) fetchNew(videos []*index.Video, storage *storages.Ready) {
 			if isSystemError(err) {
 				log.Warn().Msgf("System error, sleeping for %s", systemErrorDowntime)
 				_ = cmd.Index.Retry(video.ID, index.RetryInfinite)
-				time.Sleep(systemErrorDowntime)
+				utils.SleepContext(ctx, systemErrorDowntime)
 				continue
 			}
 

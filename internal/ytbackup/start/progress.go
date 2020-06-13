@@ -65,7 +65,7 @@ func trackProgress(ctx context.Context, cancel context.CancelFunc, path string) 
 			if left < sleep {
 				sleep = left
 			}
-			time.Sleep(sleep)
+			utils.SleepContext(ctx, sleep)
 		}
 	}(&lastEvent)
 

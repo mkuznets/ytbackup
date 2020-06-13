@@ -66,7 +66,7 @@ func (st *Storages) Get() (*Ready, error) {
 			return r, nil
 		}
 	}
-	return nil, fmt.Errorf("there is no storage with >= %s free space", utils.IBytes(freeRequired))
+	return nil, fmt.Errorf("no storage with >= %s free space", utils.IBytes(freeRequired))
 }
 
 func freeSpace(path string) uint64 {
