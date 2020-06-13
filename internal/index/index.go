@@ -199,6 +199,18 @@ func (st *Index) Done(video *Video) error {
 	})
 }
 
+func (st *Index) Skip(video *Video) error {
+	return st.db.Update(func(tx *bolt.Tx) error {
+		v := *video
+		v.Deadline = nil
+		v.Status = StatusSkipped
+		if _, err := put(tx, &v, true); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
 func (st *Index) Map(status Status, f func(*Video) error) error {
 	return st.db.View(func(tx *bolt.Tx) error {
 		return mapItems(tx, status, func(video *Video) error {

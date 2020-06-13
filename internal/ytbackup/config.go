@@ -18,6 +18,7 @@ import (
 const ConfigDefaults = `
 sources:
   update_interval: 5m
+  max_duration: 9h
 
 browser:
   executable: chromium
@@ -36,6 +37,7 @@ type Config struct {
 		History        bool
 		Playlists      map[string]string
 		UpdateInterval time.Duration `yaml:"update_interval"`
+		MaxDuration    time.Duration `yaml:"max_duration"`
 	}
 	Dirs     Dirs
 	Storages []struct {

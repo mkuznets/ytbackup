@@ -10,6 +10,7 @@ type Status string
 
 const (
 	StatusNew        Status = "NEW"
+	StatusSkipped    Status = "SKIPPED"
 	StatusInProgress Status = "INPROGRESS"
 	StatusDone       Status = "DONE"
 	StatusFailed     Status = "FAILED"
@@ -24,6 +25,7 @@ type Video struct {
 	Attempt    int             `json:"attempt,omitempty"`
 	RetryAfter *time.Time      `json:"retry_after,omitempty"`
 	Info       json.RawMessage `json:"info,omitempty"`
+	Reason     string          `json:"reason,omitempty"`
 }
 
 func (v *Video) Key() []byte {

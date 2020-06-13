@@ -21,6 +21,8 @@ SYSTEM_EXCS = (urllib.error.URLError, http.client.HTTPException, OSError)
 
 STDERR = sys.stderr
 
+DEFAULT_MAX_DURATION = 9 * 3600
+
 
 # ------------------------------------------------------------------------------
 
@@ -188,6 +190,10 @@ class Download:
 
         # ----------------------------------------------------------------------
 
+        self.max_duration = args.max_duration
+
+        # ----------------------------------------------------------------------
+
         self.root = os.path.abspath(os.path.expanduser(args.root))
 
         tmp_dir = os.path.join(self.root, ".tmp")
@@ -223,9 +229,19 @@ class Download:
         infos = {}
 
         def process_hook(data):
-            if not data.get('id') or data.get('is_live'):
+            if not data.get('id'):
                 return
+
+            if data.get('is_live'):
+                data['skipped'] = 'live'
+            elif int(data.get('duration', 0)) > self.max_duration:
+                data['skipped'] = 'toolong'
+
             infos[data['id']] = data
+
+            if data.get('skipped'):
+                return
+
             return process_info(data)
 
         try:
@@ -239,6 +255,13 @@ class Download:
         result = []
 
         for info in infos.values():
+            skipped = info.pop('skipped', None)
+            if skipped:
+                result.append({
+                    'id': info['id'],
+                    'skipped': skipped,
+                })
+                continue
 
             dir_name = "{}_{}".format(info['upload_date'], info['id'])
 
@@ -308,6 +331,7 @@ def arg_parser():
     subcmd = subparsers.add_parser('download')
     subcmd.set_defaults(func=Download)
     subcmd.add_argument('--root', required=True)
+    subcmd.add_argument('--max-duration', type=int, default=DEFAULT_MAX_DURATION)
     subcmd.add_argument('--cache')
     subcmd.add_argument('--preset', choices=['video', 'audio'], default='video')
     subcmd.add_argument('urls', nargs='+')

@@ -21,6 +21,7 @@ const (
 
 type Result struct {
 	ID        string
+	Skipped   string
 	Files     []index.File
 	OutputDir string `json:"output_dir"`
 	Info      json.RawMessage
@@ -67,17 +68,24 @@ func (cmd *Command) fetchNew(ctx context.Context, videos []*index.Video, storage
 		}
 
 		for _, res := range results {
+			if res.Skipped != "" {
+				log.Info().Str("id", res.ID).Str("reason", res.Skipped).Msg("Download skipped")
+
+				v := &index.Video{ID: res.ID, Reason: res.Skipped}
+				if err := cmd.Index.Skip(v); err != nil {
+					log.Err(err).Str("id", video.ID).Msg("Index error")
+				}
+				continue
+			}
+
 			v := &index.Video{
 				ID:       res.ID,
 				Storages: []index.Storage{{ID: storage.ID}},
 				Files:    res.Files,
 				Info:     res.Info,
 			}
-
-			log.Info().Str("id", res.ID).Msg("Updating index")
 			if err := cmd.Index.Done(v); err != nil {
 				log.Err(err).Str("id", video.ID).Msg("Index error")
-				_ = cmd.Index.Retry(video.ID, index.RetryLimited)
 				continue
 			}
 
@@ -101,12 +109,15 @@ func (cmd *Command) downloadByID(videoID, root string) ([]*Result, error) {
 		fmt.Sprintf("%s_%s.log", time.Now().Format("2006-01-02T15-04-05"), videoID),
 	)
 
+	maxDuration := int(cmd.Config.Sources.MaxDuration.Seconds())
+
 	cargs := []string{
 		"dl.py",
 		"--log=" + logPath,
 		"download",
 		"--root=" + root,
 		"--cache=" + cacheDir,
+		fmt.Sprintf("--max-duration=%d", maxDuration),
 		url,
 	}
 	go trackProgress(rctx, cancel, logPath)
