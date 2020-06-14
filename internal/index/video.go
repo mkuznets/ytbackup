@@ -3,6 +3,7 @@ package index
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"mkuznets.com/go/ytbackup/internal/utils"
@@ -45,6 +46,8 @@ func (v *Video) Row() string {
 	switch v.Status {
 	case StatusSkipped:
 		line += fmt.Sprintf("\t%s", v.Reason)
+	case StatusFailed:
+		line += fmt.Sprintf("\t%s", v.Reason)
 	case StatusDone:
 		if v.Info != nil {
 			var info InfoShort
@@ -54,6 +57,7 @@ func (v *Video) Row() string {
 			}
 		}
 	}
+	line = strings.ReplaceAll(line, "\n", " ")
 
 	return line
 }
