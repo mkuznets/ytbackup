@@ -116,7 +116,7 @@ func (cmd *Command) Init(opts interface{}) error {
 
 	idx := index.New(filepath.Join(cmd.Config.Dirs.Metadata(), "index.db"))
 	if err := idx.Init(); err != nil {
-		return fmt.Errorf("could not initialise store: %v", err)
+		return err
 	}
 	cmd.Index = idx
 

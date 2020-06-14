@@ -53,16 +53,19 @@ func (st *Index) Init() error {
 		return nil
 	}
 
-	db, err := bolt.Open(st.path, os.FileMode(0644), nil)
+	db, err := bolt.Open(st.path, os.FileMode(0644), &bolt.Options{Timeout: 3 * time.Second})
 	if err != nil {
-		return fmt.Errorf("could not open database: %v", err)
+		if errors.Is(err, bolt.ErrTimeout) {
+			return fmt.Errorf("index database is locked (probably, by another ytbackup instance)")
+		}
+		return fmt.Errorf("could not open index database at %s: %v", st.path, err)
 	}
 
 	err = db.Update(func(tx *bolt.Tx) error {
 		for _, name := range [2][]byte{bucketItems, bucketStatuses} {
 			_, err := tx.CreateBucketIfNotExists(name)
 			if err != nil {
-				return fmt.Errorf("create bucket: %s", err)
+				return fmt.Errorf("could not create index bucket: %s", err)
 			}
 		}
 		return nil
