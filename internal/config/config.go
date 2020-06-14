@@ -55,14 +55,14 @@ func (r *Reader) yamlOptions() ([]config.YAMLOption, error) {
 		options = append(options, config.Source(strings.NewReader(r.defaultConfig)))
 	}
 
-	// Alternative config from one of default paths
-	if path, ok := appdirs.SearchConfig(r.filename); ok {
-		log.Debug().Str("path", path).Msg("Config file")
-		options = append(options, config.File(path))
-	}
-
-	// Explicit config passed via CLI arguments
-	if r.explicitPath != "" {
+	if r.explicitPath == "" {
+		// Alternative config from one of default paths
+		if path, ok := appdirs.SearchConfig(r.filename); ok {
+			log.Debug().Str("path", path).Msg("Config file")
+			options = append(options, config.File(path))
+		}
+	} else {
+		// Explicit config passed via CLI arguments
 		path, err := homedir.Expand(r.explicitPath)
 		if err != nil {
 			return nil, err
