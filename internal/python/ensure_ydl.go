@@ -53,7 +53,7 @@ func (py *Python) ensureYDL(ctx context.Context) (bool, error) {
 }
 
 func (py *Python) makeYDLLite(ctx context.Context) error {
-	out, err := py.run(ctx, "ydl_lite.py")
+	out, err := py.run(ctx, "ydl.py", "make_lite")
 	if err != nil {
 		return fmt.Errorf("could not create lite version of youtube-dl: %s", out)
 	}

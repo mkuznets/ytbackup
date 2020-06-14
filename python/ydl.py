@@ -59,7 +59,7 @@ def make_lite():
 
     os.remove(os.path.join(extractor_dir, 'lazy_extractors.py'))
 
-    r = subprocess.run([sys.executable, "ydl_test.py"])
+    r = subprocess.run([sys.executable, "ydl.py", "test"])
     r.check_returncode()
 
 
