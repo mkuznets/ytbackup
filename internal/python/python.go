@@ -44,6 +44,9 @@ func (py *Python) Init(ctx context.Context) error {
 	py.runLock.Lock()
 	defer py.runLock.Unlock()
 
+	if err := py.ensureFFMPEG(ctx); err != nil {
+		return err
+	}
 	if err := py.ensurePython(ctx); err != nil {
 		return err
 	}

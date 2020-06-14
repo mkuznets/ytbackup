@@ -1,12 +1,14 @@
 package python
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/rakyll/statik/fs"
@@ -106,5 +108,38 @@ func (py *Python) ensurePyCache(ctx context.Context) error {
 		return fmt.Errorf("could not create pycache: %v", err)
 	}
 
+	return nil
+}
+
+func (py *Python) ensureFFMPEG(ctx context.Context) error {
+	name := "ffmpeg"
+	args := []string{"-version"}
+
+	log.Debug().Str("executable", name).Strs("args", args).Msg("Running")
+
+	c := exec.CommandContext(ctx, name, args...)
+
+	var b bytes.Buffer
+	c.Stdout = &b
+
+	if err := c.Run(); err != nil {
+		return fmt.Errorf("ffmpeg is not available")
+	}
+
+	versionLine, err := bufio.NewReader(&b).ReadString('\n')
+	if err != nil {
+		log.Warn().Err(err).Msg("could not read ffmpeg version")
+		return nil
+	}
+
+	var version string
+
+	n, err := fmt.Sscanf(versionLine, "ffmpeg version %s", &version)
+	if err != nil || n != 1 {
+		log.Warn().Err(err).Msg("could not read ffmpeg version")
+		return nil
+	}
+
+	log.Debug().Str("version", version).Msg("ffmpeg")
 	return nil
 }
