@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -63,7 +64,14 @@ func (cmd *Command) fetchNew(ctx context.Context, videos []*index.Video, storage
 				continue
 			}
 
-			_ = cmd.Index.Retry(video.ID, index.RetryLimited)
+			if isRetriable(err) {
+				_ = cmd.Index.Retry(video.ID, index.RetryLimited)
+			} else {
+				log.Info().Str("id", video.ID).Msg("Download failed with non-retriable error")
+				video.Status = index.StatusFailed
+				video.Reason = err.Error()
+				_ = cmd.Index.Put(video)
+			}
 			continue
 		}
 
@@ -135,4 +143,13 @@ func isSystemError(err error) bool {
 		return true
 	}
 	return false
+}
+
+func isRetriable(err error) bool {
+	text := err.Error()
+	if strings.Contains(text, "video is private") ||
+		strings.Contains(text, "no longer available") {
+		return false
+	}
+	return true
 }

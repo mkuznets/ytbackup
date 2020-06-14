@@ -40,6 +40,12 @@ func (v *Video) StatusKey() []byte {
 	return []byte(fmt.Sprintf("%s::%s", v.Status, v.ID))
 }
 
+func (v *Video) ClearSystem() {
+	v.RetryAfter = nil
+	v.Attempt = 0
+	v.Deadline = nil
+}
+
 func (v *Video) Row() string {
 	line := fmt.Sprintf("%s\t%s", v.Status, v.ID)
 

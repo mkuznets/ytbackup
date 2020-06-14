@@ -156,8 +156,6 @@ func (st *Index) Pop(n int) ([]*Video, error) {
 }
 
 func (st *Index) Retry(id string, mode RetryMode) error {
-	log.Info().Str("id", id).Msg("Retry later")
-
 	return st.db.Update(func(tx *bolt.Tx) error {
 		value := tx.Bucket(bucketItems).Get([]byte(id))
 		if value == nil {
@@ -182,6 +180,7 @@ func (st *Index) Retry(id string, mode RetryMode) error {
 			}
 		}
 
+		log.Info().Str("id", id).Msg("Retry later")
 		if _, err := put(tx, &video, true); err != nil {
 			return err
 		}
@@ -195,6 +194,17 @@ func (st *Index) Done(video *Video) error {
 		v := *video
 		v.Deadline = nil
 		v.Status = StatusDone
+		if _, err := put(tx, &v, true); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func (st *Index) Put(video *Video) error {
+	return st.db.Update(func(tx *bolt.Tx) error {
+		v := *video
+		v.ClearSystem()
 		if _, err := put(tx, &v, true); err != nil {
 			return err
 		}
