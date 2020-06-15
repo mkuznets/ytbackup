@@ -15,8 +15,11 @@ import (
 const (
 	marker           = "__progress__"
 	progressInterval = 5 * time.Second
-	idleTimeout      = 3 * time.Minute
-	leftWarning      = time.Minute
+
+	// TODO: log progress of checksum computation in dl.py
+	idleTimeout = 7 * time.Minute
+
+	leftWarning = time.Minute
 )
 
 type Progress struct {
