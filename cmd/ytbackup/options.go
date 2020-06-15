@@ -2,6 +2,7 @@ package main
 
 import (
 	"mkuznets.com/go/ytbackup/internal/ytbackup"
+	"mkuznets.com/go/ytbackup/internal/ytbackup/check"
 	"mkuznets.com/go/ytbackup/internal/ytbackup/start"
 )
 
@@ -11,5 +12,5 @@ type Options struct {
 	Setup  *ytbackup.SetupCommand  `command:"setup" description:""`
 	Import *ytbackup.ImportCommand `command:"import" description:"retrieve videos from Google's takeout JSON files"`
 	List   *ytbackup.ListCommand   `command:"list" description:""`
-	Check  *ytbackup.CheckCommand  `command:"check"`
+	Check  *check.Command          `command:"check"`
 }
