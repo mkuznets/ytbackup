@@ -101,7 +101,7 @@ func (cmd *Command) downloadByID(video *index.Video, rootDir string) ([]*Result,
 		rootDir,
 		published.Format("2006"),
 		published.Format("01"),
-		fmt.Sprintf("%s_%s", published.Format("200601"), video.ID),
+		fmt.Sprintf("%s_%s", published.Format("20060102"), video.ID),
 	)
 
 	logPath := filepath.Join(
