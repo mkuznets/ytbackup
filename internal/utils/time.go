@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/senseyeio/duration"
 )
 
 func RunEveryInterval(ctx context.Context, interval time.Duration, fun func() error) error {
@@ -61,4 +63,18 @@ func FormatDuration(seconds int) string {
 	d -= m * time.Minute
 	s := d / time.Second
 	return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
+}
+
+func ParseISO8601(s string) (time.Duration, error) {
+	d, err := duration.ParseISO8601(s)
+	if err != nil {
+		return 0, err
+	}
+
+	var dur time.Duration
+	dur += time.Duration(d.TH) * time.Hour
+	dur += time.Duration(d.TM) * time.Minute
+	dur += time.Duration(d.TS) * time.Second
+
+	return dur, nil
 }

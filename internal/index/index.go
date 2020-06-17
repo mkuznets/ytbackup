@@ -125,7 +125,7 @@ func (st *Index) Pop(n int) ([]*Video, error) {
 	err := st.db.Update(func(tx *bolt.Tx) error {
 		i := 0
 
-		return mapItems(tx, StatusNew, func(video *Video) error {
+		return mapItems(tx, StatusEnqueued, func(video *Video) error {
 			if video.RetryAfter != nil && video.RetryAfter.After(time.Now()) {
 				return nil
 			}
@@ -155,6 +155,25 @@ func (st *Index) Pop(n int) ([]*Video, error) {
 	return items, nil
 }
 
+func (st *Index) Get(status Status, n int) ([]*Video, error) {
+	i := 0
+	videos := make([]*Video, 0, n)
+
+	err := st.Map(status, func(video *Video) error {
+		videos = append(videos, video)
+		i++
+		if i >= n {
+			return ErrStop
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return videos, nil
+}
+
 func (st *Index) Retry(id string, mode RetryMode) error {
 	return st.db.Update(func(tx *bolt.Tx) error {
 		value := tx.Bucket(bucketItems).Get([]byte(id))
@@ -167,7 +186,7 @@ func (st *Index) Retry(id string, mode RetryMode) error {
 			return err
 		}
 
-		video.Status = StatusNew
+		video.Status = StatusEnqueued
 
 		if mode == RetryLimited {
 			video.Attempt++
@@ -201,12 +220,14 @@ func (st *Index) Done(video *Video) error {
 	})
 }
 
-func (st *Index) Put(video *Video) error {
+func (st *Index) Put(videos ...*Video) error {
 	return st.db.Update(func(tx *bolt.Tx) error {
-		v := *video
-		v.ClearSystem()
-		if _, err := put(tx, &v, true); err != nil {
-			return err
+		for _, video := range videos {
+			v := *video
+			v.ClearSystem()
+			if _, err := put(tx, &v, true); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -227,10 +248,7 @@ func (st *Index) Skip(video *Video) error {
 func (st *Index) Map(status Status, f func(*Video) error) error {
 	return st.db.View(func(tx *bolt.Tx) error {
 		return mapItems(tx, status, func(video *Video) error {
-			if err := f(video); err != nil {
-				return fmt.Errorf("list callback: %v", err)
-			}
-			return nil
+			return f(video)
 		})
 	})
 }
@@ -263,7 +281,7 @@ func (st *Index) ensureTimeoutOnce() error {
 			if video.Deadline.Before(time.Now()) {
 				log.Debug().Str("id", video.ID).Msg("Download timed out, retrying")
 				video.Deadline = nil
-				video.Status = StatusNew
+				video.Status = StatusEnqueued
 
 				if _, err := put(tx, video, true); err != nil {
 					return err

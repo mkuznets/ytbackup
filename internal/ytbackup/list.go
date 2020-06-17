@@ -10,7 +10,7 @@ import (
 )
 
 type ListCommand struct {
-	Status string `short:"s" long:"status" choice:"DONE" choice:"NEW" choice:"FAILED" choice:"SKIPPED" choice:"INPROGRESS" description:""` // nolint
+	Status string `short:"s" long:"status" choice:"DONE" choice:"NEW" choice:"ENQUEUED" choice:"FAILED" choice:"SKIPPED" choice:"INPROGRESS" description:""` // nolint
 	JSON   bool   `long:"json" description:""`
 	Command
 }

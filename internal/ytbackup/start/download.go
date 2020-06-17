@@ -2,7 +2,6 @@ package start
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -21,11 +20,9 @@ const (
 )
 
 type Result struct {
-	ID        string
-	Skipped   string
-	Files     []index.File
-	OutputDir string `json:"output_dir"`
-	Info      json.RawMessage
+	ID      string
+	Skipped string
+	Files   []index.File
 }
 
 func (cmd *Command) Serve(ctx context.Context) error {
@@ -53,7 +50,7 @@ func (cmd *Command) fetchNew(ctx context.Context, videos []*index.Video, storage
 	for _, video := range videos {
 		log.Info().Str("id", video.ID).Msg("Downloading")
 
-		results, err := cmd.downloadByID(video.ID, storage.Path)
+		results, err := cmd.downloadByID(video, storage.Path)
 		if err != nil {
 			log.Err(err).Str("id", video.ID).Msg("Download error")
 
@@ -76,23 +73,14 @@ func (cmd *Command) fetchNew(ctx context.Context, videos []*index.Video, storage
 		}
 
 		for _, res := range results {
-			if res.Skipped != "" {
-				log.Info().Str("id", res.ID).Str("reason", res.Skipped).Msg("Download skipped")
-
-				v := &index.Video{ID: res.ID, Reason: res.Skipped}
-				if err := cmd.Index.Skip(v); err != nil {
-					log.Err(err).Str("id", video.ID).Msg("Index error")
-				}
+			if res.ID != video.ID {
 				continue
 			}
 
-			v := &index.Video{
-				ID:       res.ID,
-				Storages: []index.Storage{{ID: storage.ID}},
-				Files:    res.Files,
-				Info:     res.Info,
-			}
-			if err := cmd.Index.Done(v); err != nil {
+			video.Storages = []index.Storage{{ID: storage.ID}}
+			video.Files = res.Files
+
+			if err := cmd.Index.Done(video); err != nil {
 				log.Err(err).Str("id", video.ID).Msg("Index error")
 				continue
 			}
@@ -104,29 +92,31 @@ func (cmd *Command) fetchNew(ctx context.Context, videos []*index.Video, storage
 	}
 }
 
-func (cmd *Command) downloadByID(videoID, root string) ([]*Result, error) {
+func (cmd *Command) downloadByID(video *index.Video, rootDir string) ([]*Result, error) {
 	rctx, cancel := context.WithCancel(cmd.CriticalCtx)
 	defer cancel()
 
-	url := fmt.Sprintf(ytVideoURLFormat, videoID)
-
-	cacheDir := cmd.Config.Dirs.Cache
+	published := video.Meta.PublishedAt
+	destDir := filepath.Join(
+		rootDir,
+		published.Format("2006"),
+		published.Format("01"),
+		fmt.Sprintf("%s_%s", published.Format("200601"), video.ID),
+	)
 
 	logPath := filepath.Join(
 		cmd.Config.Dirs.Logs(),
-		fmt.Sprintf("%s_%s.log", time.Now().Format("2006-01-02T15-04-05"), videoID),
+		fmt.Sprintf("%s_%s.log", time.Now().Format("2006-01-02T15-04-05"), video.ID),
 	)
-
-	maxDuration := int(cmd.Config.Sources.MaxDuration.Seconds())
 
 	cargs := []string{
 		"dl.py",
 		"--log=" + logPath,
 		"download",
-		"--root=" + root,
-		"--cache=" + cacheDir,
-		fmt.Sprintf("--max-duration=%d", maxDuration),
-		url,
+		"--root=" + rootDir,
+		"--cache=" + cmd.Config.Dirs.Cache,
+		"--dst=" + destDir,
+		fmt.Sprintf(ytVideoURLFormat, video.ID),
 	}
 	go trackProgress(rctx, cancel, logPath)
 

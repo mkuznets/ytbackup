@@ -3,7 +3,6 @@
 import argparse
 import contextlib
 import copy
-import datetime as dt
 import glob
 import hashlib
 import http.client
@@ -20,8 +19,6 @@ from unittest import mock
 SYSTEM_EXCS = (urllib.error.URLError, http.client.HTTPException, OSError)
 
 STDERR = sys.stderr
-
-DEFAULT_MAX_DURATION = 9 * 3600
 
 
 # ------------------------------------------------------------------------------
@@ -175,30 +172,19 @@ def sha256sum(filename: str) -> str:
 # ------------------------------------------------------------------------------
 
 
-def urls_hash(urls: typing.List[str]) -> str:
-    h = hashlib.sha1()
-    for url in sorted(urls):
-        h.update(url.encode())
-        h.update(b'::')
-    return h.hexdigest()
-
-
 class Download:
     def __init__(self, args: argparse.Namespace):
-        self.urls = args.urls
+        self.url = args.url
         self.logger = get_logger(args.log)
 
         # ----------------------------------------------------------------------
 
-        self.max_duration = args.max_duration
-
-        # ----------------------------------------------------------------------
+        self.dest_dir = os.path.abspath(os.path.expanduser(args.dst))
+        os.makedirs(os.path.dirname(self.dest_dir), exist_ok=True)
 
         self.root = os.path.abspath(os.path.expanduser(args.root))
 
-        tmp_dir = os.path.join(self.root, ".tmp")
-
-        self.output_dir = os.path.join(tmp_dir, 'dl_{}'.format(urls_hash(args.urls)))
+        self.output_dir = tmp_dir = os.path.join(self.root, ".tmp")
         os.makedirs(self.output_dir, exist_ok=True)
 
         # Cache for youtube-dl
@@ -209,7 +195,7 @@ class Download:
 
         opts = getattr(Preset(logger=self.logger), args.preset)
         opts.update(
-            outtmpl=os.path.join(self.output_dir, '%(upload_date)s_%(id)s/%(id)s.%(ext)s'),
+            outtmpl=os.path.join(self.output_dir, '%(id)s/%(id)s.%(ext)s'),
             progress_hooks=[create_progress_hook(self.logger)],
             cachedir=cache_dir,
         )
@@ -231,93 +217,50 @@ class Download:
         def process_hook(data):
             if not data.get('id'):
                 return
-
-            if data.get('is_live'):
-                data['skipped'] = 'live'
-            elif int(data.get('duration', 0)) > self.max_duration:
-                data['skipped'] = 'toolong'
-
             infos[data['id']] = data
-
-            if data.get('skipped'):
-                return
-
             return process_info(data)
 
         try:
             with mock.patch.object(ydl, 'process_info', process_hook):
-                ydl.download(self.urls)
+                ydl.download([self.url])
         except youtube_dl.DownloadError as exc:
             if exc.exc_info[0] in SYSTEM_EXCS:
                 raise Error(str(exc), reason='system') from exc
             raise
 
+        if not infos:
+            raise Error("result is empty")
+
         result = []
 
         for info in infos.values():
-            skipped = info.pop('skipped', None)
-            if skipped:
-                result.append({
-                    'id': info['id'],
-                    'skipped': skipped,
-                })
-                continue
-
-            dir_name = "{}_{}".format(info['upload_date'], info['id'])
-
-            result_dir = os.path.join(self.output_dir, dir_name)
+            result_dir = os.path.join(self.output_dir, info['id'])
             if not os.path.exists(result_dir):
-                continue
+                raise Error("result directory is not found: %s".format(info['id']))
 
-            upload_date = dt.datetime.strptime(info['upload_date'], '%Y%m%d').date()
-            dest_dir = os.path.join(
-                self.root,
-                upload_date.strftime("%Y"),
-                upload_date.strftime("%m"),
-                dir_name,
-            )
-
-            os.makedirs(os.path.dirname(dest_dir), exist_ok=True)
-
-            shutil.rmtree(dest_dir, ignore_errors=True)
-            shutil.move(result_dir, dest_dir)
+            shutil.rmtree(self.dest_dir, ignore_errors=True)
+            shutil.move(result_dir, self.dest_dir)
 
             files = []
 
-            for path in glob.glob(os.path.join(dest_dir, "**"), recursive=True):
+            for path in glob.glob(os.path.join(self.dest_dir, "**"), recursive=True):
                 self.logger.info("output file: %s", path)
-
                 try:
                     fi = os.stat(path)
                 except OSError as exc:
                     raise Error('could not stat output file') from exc
 
-                if stat.S_ISDIR(fi.st_mode):
-                    continue
-
-                filehash = sha256sum(path)
-
-                files.append({
-                    "path": os.path.relpath(path, self.root),
-                    "hash": filehash,
-                    "size": fi.st_size,
-                })
-
-            redundant_keys = (
-                'formats', 'requested_formats', 'format', 'format_id', 'requested_subtitles',
-                *(k for k in info if str(k).startswith('_')),
-            )
-            for key in redundant_keys:
-                info.pop(key, None)
+                if stat.S_ISREG(fi.st_mode):
+                    files.append({
+                        "path": os.path.relpath(path, self.root),
+                        "hash": sha256sum(path),
+                        "size": fi.st_size,
+                    })
 
             result.append({
                 'id': info['id'],
                 'files': files,
-                'output_dir': self.output_dir,
-                'info': info,
             })
-
-        shutil.rmtree(self.output_dir, ignore_errors=True)
 
         return result
 
@@ -331,10 +274,10 @@ def arg_parser():
     subcmd = subparsers.add_parser('download')
     subcmd.set_defaults(func=Download)
     subcmd.add_argument('--root', required=True)
-    subcmd.add_argument('--max-duration', type=int, default=DEFAULT_MAX_DURATION)
+    subcmd.add_argument('--dst', required=True)
     subcmd.add_argument('--cache')
     subcmd.add_argument('--preset', choices=['video', 'audio'], default='video')
-    subcmd.add_argument('urls', nargs='+')
+    subcmd.add_argument('url')
 
     return parser
 

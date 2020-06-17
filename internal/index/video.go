@@ -1,18 +1,16 @@
 package index
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
-
-	"mkuznets.com/go/ytbackup/internal/utils"
 )
 
 type Status string
 
 const (
 	StatusNew        Status = "NEW"
+	StatusEnqueued   Status = "ENQUEUED"
 	StatusSkipped    Status = "SKIPPED"
 	StatusInProgress Status = "INPROGRESS"
 	StatusDone       Status = "DONE"
@@ -21,15 +19,15 @@ const (
 )
 
 type Video struct {
-	ID         string          `json:"id"`
-	Status     Status          `json:"status"`
-	Storages   []Storage       `json:"storages,omitempty"`
-	Files      []File          `json:"file,omitempty"`
-	Deadline   *time.Time      `json:"deadline,omitempty"`
-	Attempt    int             `json:"attempt,omitempty"`
-	RetryAfter *time.Time      `json:"retry_after,omitempty"`
-	Info       json.RawMessage `json:"info,omitempty"`
-	Reason     string          `json:"reason,omitempty"`
+	ID         string     `json:"id"`
+	Status     Status     `json:"status"`
+	Storages   []Storage  `json:"storages,omitempty"`
+	Files      []File     `json:"file,omitempty"`
+	Deadline   *time.Time `json:"deadline,omitempty"`
+	Attempt    int        `json:"attempt,omitempty"`
+	RetryAfter *time.Time `json:"retry_after,omitempty"`
+	Meta       *Meta      `json:"meta,omitempty"`
+	Reason     string     `json:"reason,omitempty"`
 }
 
 func (v *Video) Key() []byte {
@@ -55,12 +53,8 @@ func (v *Video) Row() string {
 	case StatusFailed:
 		line += fmt.Sprintf("\t%s", v.Reason)
 	case StatusDone:
-		if v.Info != nil {
-			var info InfoShort
-			err := json.Unmarshal(v.Info, &info)
-			if err == nil {
-				line += info.Row()
-			}
+		if v.Meta != nil {
+			line += v.Meta.Row()
 		}
 	}
 	line = strings.ReplaceAll(line, "\n", " ")
@@ -78,25 +72,20 @@ type File struct {
 	Size uint64 `json:"size"`
 }
 
-type InfoShort struct {
-	Uploader   string
-	Title      string
-	Duration   int
-	UploadDate string `json:"upload_date"`
+type Meta struct {
+	Title        string    `json:"title,omitempty"`
+	Description  string    `json:"description,omitempty"`
+	ChannelID    string    `json:"channel_id,omitempty"`
+	ChannelTitle string    `json:"channel_title,omitempty"`
+	Tags         []string  `json:"tags,omitempty"`
+	PublishedAt  time.Time `json:"published_at,omitempty"`
 }
 
-func (info *InfoShort) Row() string {
-	uploadDateString := "0000-00-00"
-	uploadDate, err := time.Parse("20060102", info.UploadDate)
-	if err == nil {
-		uploadDateString = uploadDate.Format("2006-01-02")
-	}
-
+func (meta *Meta) Row() string {
 	return fmt.Sprintf(
-		"\t%s\t%s\t%s\t%s",
-		uploadDateString,
-		utils.FormatDuration(info.Duration),
-		info.Uploader,
-		info.Title,
+		"\t%s\t%s\t%s",
+		meta.PublishedAt.Format("2006-01-02"),
+		meta.ChannelTitle,
+		meta.Title,
 	)
 }

@@ -60,6 +60,14 @@ func (cmd *Command) Execute([]string) error {
 		}()
 	}
 
+	cmd.Wg.Add(1)
+	go func() {
+		if err := cmd.FetchMeta(cmd.Ctx); err != nil {
+			log.Err(err).Msg("fetcher")
+		}
+		defer cmd.Wg.Done()
+	}()
+
 	if !cmd.DisableDownload {
 		log.Info().Msg("Downloader: starting")
 		if err := cmd.Serve(cmd.Ctx); err != nil {
