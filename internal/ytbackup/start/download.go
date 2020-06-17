@@ -152,6 +152,7 @@ func isRetriable(err error) bool {
 		strings.Contains(text, "video has been removed") ||
 		strings.Contains(text, "copyright grounds") ||
 		strings.Contains(text, "in your country") ||
+		strings.Contains(text, "confirm your age") ||
 		strings.Contains(text, "video is unavailable") {
 		return false
 	}
