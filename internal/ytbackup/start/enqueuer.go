@@ -121,5 +121,5 @@ func logProgress(videos []*index.Video) {
 		e = e.Int(st, n)
 	}
 
-	e.Msg("New videos enqueued")
+	e.Msg("Enqueuer")
 }
