@@ -8,7 +8,7 @@ import (
 	"mkuznets.com/go/ytbackup/internal/youtube"
 )
 
-func (cmd *Command) crawlAPI(ctx context.Context) error {
+func (cmd *Command) APICrawler(ctx context.Context) error {
 	videos := make([]string, 0, 50)
 
 	service, err := youtube.NewService(ctx, cmd.Config.Youtube.OAuth.Token())

@@ -13,7 +13,7 @@ import (
 	yt "mkuznets.com/go/ytbackup/internal/youtube"
 )
 
-func (cmd *Command) FetchMeta(ctx context.Context) error {
+func (cmd *Command) Enqueuer(ctx context.Context) error {
 	service, err := yt.NewService(cmd.Ctx, cmd.Config.Youtube.OAuth.Token())
 	if err != nil {
 		return err
@@ -110,13 +110,16 @@ func (cmd *Command) fromAPIResult(video *index.Video, result *youtube.Video) {
 }
 
 func logProgress(videos []*index.Video) {
-	sts := make(map[string]int)
+	statuses := make(map[string]int)
+
 	for _, video := range videos {
-		sts[string(video.Status)]++
+		statuses[string(video.Status)]++
 	}
+
 	e := log.Info()
-	for st, n := range sts {
+	for st, n := range statuses {
 		e = e.Int(st, n)
 	}
-	e.Msg("Processed NEW videos")
+
+	e.Msg("New videos enqueued")
 }

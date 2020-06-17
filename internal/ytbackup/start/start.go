@@ -36,7 +36,7 @@ func (cmd *Command) Execute([]string) error {
 				Stringer("interval", cmd.Config.Sources.UpdateInterval).
 				Msg("Watch history crawler: starting")
 
-			if err := cmd.crawlHistory(cmd.Ctx); err != nil {
+			if err := cmd.HistoryCrawler(cmd.Ctx); err != nil {
 				log.Err(err).Msg("Watch history crawler")
 				return
 			}
@@ -52,7 +52,7 @@ func (cmd *Command) Execute([]string) error {
 				Stringer("interval", cmd.Config.Sources.UpdateInterval).
 				Msg("Playlists crawler: starting")
 
-			if err := cmd.crawlAPI(cmd.Ctx); err != nil {
+			if err := cmd.APICrawler(cmd.Ctx); err != nil {
 				log.Err(err).Msg("Playlists crawler")
 				return
 			}
@@ -60,16 +60,17 @@ func (cmd *Command) Execute([]string) error {
 		}()
 	}
 
-	cmd.Wg.Add(1)
-	go func() {
-		if err := cmd.FetchMeta(cmd.Ctx); err != nil {
-			log.Err(err).Msg("fetcher")
-		}
-		defer cmd.Wg.Done()
-	}()
-
 	if !cmd.DisableDownload {
 		log.Info().Msg("Downloader: starting")
+
+		cmd.Wg.Add(1)
+		go func() {
+			if err := cmd.Enqueuer(cmd.Ctx); err != nil {
+				log.Err(err).Msg("Enqueuer error")
+			}
+			defer cmd.Wg.Done()
+		}()
+
 		if err := cmd.Serve(cmd.Ctx); err != nil {
 			return err
 		}
