@@ -118,7 +118,7 @@ def suppress_output():
             yield
 
 
-def get_logger(filename: typing.Optional[str] = None):
+def get_logger(filename: typing.Optional[str] = None) -> logging.Logger:
     logger = logging.getLogger("log")
     logger.setLevel(logging.DEBUG)
 
@@ -159,12 +159,16 @@ def create_progress_hook(logger):
 
 
 # noinspection PyUnresolvedReferences
-def sha256sum(filename: str) -> str:
+def sha256sum(filename: str, logger: logging.Logger) -> str:
     h = hashlib.sha256()
     b = bytearray(128 * 1024)
     mv = memoryview(b)
+    total = 0
     with open(filename, 'rb', buffering=0) as f:
-        for n in iter(lambda: f.readinto(mv), 0):
+        for i, n in enumerate(iter(lambda: f.readinto(mv), 0)):
+            total += n
+            if not (i % 160):
+                logger.info("sha256: %d", total)
             h.update(mv[:n])
     return h.hexdigest()
 
@@ -253,7 +257,7 @@ class Download:
                 if stat.S_ISREG(fi.st_mode):
                     files.append({
                         "path": os.path.relpath(path, self.root),
-                        "hash": sha256sum(path),
+                        "hash": sha256sum(path, self.logger),
                         "size": fi.st_size,
                     })
 
