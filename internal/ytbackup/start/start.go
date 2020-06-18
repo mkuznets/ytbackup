@@ -28,7 +28,7 @@ func (cmd *Command) Execute([]string) error {
 	}
 	defer cmd.Python.Close()
 
-	if cmd.Config.Sources.History {
+	if cmd.Config.Sources.History.Enable {
 		cmd.Wg.Add(1)
 		go func() {
 			defer cmd.Wg.Done()

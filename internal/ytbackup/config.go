@@ -34,7 +34,9 @@ python:
 
 type Config struct {
 	Sources struct {
-		History        bool
+		History struct {
+			Enable bool
+		}
 		Playlists      map[string]string
 		UpdateInterval time.Duration `yaml:"update_interval"`
 		MaxDuration    time.Duration `yaml:"max_duration"`
@@ -152,16 +154,16 @@ func (cfg *Config) Validate() error {
 		return err
 	}
 
-	if cfg.Sources.History {
+	if err := cfg.validateYoutube(); err != nil {
+		return fmt.Errorf("youtube config error:\n%v", err)
+	}
+
+	if cfg.Sources.History.Enable {
 		if err := cfg.validateBrowser(); err != nil {
 			return fmt.Errorf("watch history is enabled, but browser is misconfigured:\n%v", err)
 		}
 	}
-	if len(cfg.Sources.Playlists) > 0 {
-		if err := cfg.validateYoutube(); err != nil {
-			return fmt.Errorf("playlists are enabled, but youtube config is invalid:\n%v", err)
-		}
-	}
+
 	if err := cfg.validateStorages(); err != nil {
 		return err
 	}
@@ -171,7 +173,7 @@ func (cfg *Config) Validate() error {
 func (cfg *Config) validateYoutube() error {
 	oauth := cfg.Youtube.OAuth
 	if oauth.AccessToken == "" || oauth.RefreshToken == "" || oauth.TokenType == "" {
-		return errors.New("oauth.{access_token, token_type, refresh_token} are required with `method: oauth`")
+		return errors.New("oauth.{access_token, token_type, refresh_token} are required")
 	}
 	return nil
 }
