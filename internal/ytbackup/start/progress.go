@@ -27,7 +27,7 @@ type Progress struct {
 	Finished   bool
 }
 
-func trackProgress(ctx context.Context, cancel context.CancelFunc, path string) {
+func trackProgress(ctx context.Context, cancel context.CancelFunc, path, id string) {
 	cfg := tail.Config{Follow: true, Logger: tail.DiscardingLogger}
 
 	mainLog, err := tail.TailFile(path, cfg)
@@ -98,12 +98,12 @@ Loop:
 			}
 
 			if limiter.Allow() || progress.Finished {
-				ev := log.Info().Str("done", progress.Done)
+				ev := log.Info().Str("pc", progress.Done).Str("id", id)
 				if progress.Downloaded > 0 {
-					ev = ev.Str("downloaded", utils.IBytes(progress.Downloaded))
+					ev = ev.Str("dl", utils.IBytes(progress.Downloaded))
 				}
 				if progress.Total > 0 {
-					ev = ev.Str("total", utils.IBytes(progress.Total))
+					ev = ev.Str("tot", utils.IBytes(progress.Total))
 				}
 				ev.Msg("Progress")
 			}

@@ -118,7 +118,7 @@ func (cmd *Command) downloadByID(video *index.Video, rootDir string) ([]*Result,
 		"--dst=" + destDir,
 		fmt.Sprintf(ytVideoURLFormat, video.ID),
 	}
-	go trackProgress(rctx, cancel, logPath)
+	go trackProgress(rctx, cancel, logPath, video.ID)
 
 	var result []*Result
 	if err := cmd.Python.RunScript(rctx, &result, cargs...); err != nil {
