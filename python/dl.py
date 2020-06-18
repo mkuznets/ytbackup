@@ -35,6 +35,7 @@ class YDLOpts:
         'geo_bypass': True,
         'verbose': False,
         'prefer_ffmpeg': True,
+        'noplaylist': True,
     }
     download = {
         'write_all_thumbnails': True,
