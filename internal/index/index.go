@@ -37,14 +37,17 @@ type Index struct {
 	timeoutCheckPeriod time.Duration
 	wg                 *sync.WaitGroup
 	cancel             context.CancelFunc
+	beatLock           sync.Mutex
+	beats              map[string]time.Time
 }
 
 func New(path string) *Index {
 	return &Index{
 		path:               path,
-		timeout:            20 * time.Minute,
-		timeoutCheckPeriod: time.Second,
+		timeout:            5 * time.Minute,
+		timeoutCheckPeriod: time.Minute,
 		wg:                 &sync.WaitGroup{},
+		beats:              make(map[string]time.Time),
 	}
 }
 
@@ -208,18 +211,6 @@ func (st *Index) Retry(id string, mode RetryMode) error {
 	})
 }
 
-func (st *Index) Done(video *Video) error {
-	return st.db.Update(func(tx *bolt.Tx) error {
-		v := *video
-		v.Deadline = nil
-		v.Status = StatusDone
-		if _, err := put(tx, &v, true); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
 func (st *Index) Put(videos ...*Video) error {
 	return st.db.Update(func(tx *bolt.Tx) error {
 		for _, video := range videos {
@@ -228,18 +219,6 @@ func (st *Index) Put(videos ...*Video) error {
 			if _, err := put(tx, &v, true); err != nil {
 				return err
 			}
-		}
-		return nil
-	})
-}
-
-func (st *Index) Skip(video *Video) error {
-	return st.db.Update(func(tx *bolt.Tx) error {
-		v := *video
-		v.Deadline = nil
-		v.Status = StatusSkipped
-		if _, err := put(tx, &v, true); err != nil {
-			return err
 		}
 		return nil
 	})
@@ -278,7 +257,18 @@ func (st *Index) ensureTimeoutOnce() error {
 					Msg("Video does not have a deadline")
 				return nil
 			}
-			if video.Deadline.Before(time.Now()) {
+
+			now := time.Now()
+
+			if beat, ok := st.beats[video.ID]; ok && beat.After(now) {
+				video.Deadline = &beat
+				if _, err := put(tx, video, true); err != nil {
+					return err
+				}
+				return nil
+			}
+
+			if video.Deadline.Before(now) {
 				log.Debug().Str("id", video.ID).Msg("Download timed out, retrying")
 				video.Deadline = nil
 				video.Status = StatusEnqueued
@@ -290,6 +280,15 @@ func (st *Index) ensureTimeoutOnce() error {
 			return nil
 		})
 	})
+}
+
+func (st *Index) Beat(id string) {
+	st.beatLock.Lock()
+	defer st.beatLock.Unlock()
+	for k := range st.beats {
+		delete(st.beats, k)
+	}
+	st.beats[id] = time.Now().Add(st.timeout)
 }
 
 func (st *Index) Check() error {

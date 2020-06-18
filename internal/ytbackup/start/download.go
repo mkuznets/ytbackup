@@ -20,9 +20,8 @@ const (
 )
 
 type Result struct {
-	ID      string
-	Skipped string
-	Files   []index.File
+	ID    string
+	Files []index.File
 }
 
 func (cmd *Command) Serve(ctx context.Context) error {
@@ -79,8 +78,9 @@ func (cmd *Command) fetchNew(ctx context.Context, videos []*index.Video, storage
 
 			video.Storages = []index.Storage{{ID: storage.ID}}
 			video.Files = res.Files
+			video.Status = index.StatusDone
 
-			if err := cmd.Index.Done(video); err != nil {
+			if err := cmd.Index.Put(video); err != nil {
 				log.Err(err).Str("id", video.ID).Msg("Index error")
 				continue
 			}
@@ -118,6 +118,13 @@ func (cmd *Command) downloadByID(video *index.Video, rootDir string) ([]*Result,
 		"--dst=" + destDir,
 		fmt.Sprintf(ytVideoURLFormat, video.ID),
 	}
+
+	go func() {
+		_ = utils.RunEveryInterval(rctx, 30*time.Second, func() error {
+			cmd.Index.Beat(video.ID)
+			return nil
+		})
+	}()
 	go trackProgress(rctx, cancel, logPath, video.ID)
 
 	var result []*Result
