@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"mkuznets.com/go/ytbackup/internal/utils/ticker"
 
 	bolt "go.etcd.io/bbolt"
 )
@@ -233,18 +234,14 @@ func (st *Index) Map(status Status, f func(*Video) error) error {
 }
 
 func (st *Index) ensureTimeout(ctx context.Context) {
-	ticker := time.NewTicker(st.timeoutCheckPeriod)
-	for {
-		select {
-		case <-ctx.Done():
-			st.wg.Done()
-			return
-		case <-ticker.C:
-			if err := st.ensureTimeoutOnce(); err != nil {
-				log.Warn().Err(err).Msg("ensureTimeout error")
-			}
+	ticker.New(st.timeoutCheckPeriod, ticker.SkipFirst).MustDo(ctx, func() error {
+		if err := st.ensureTimeoutOnce(); err != nil {
+			log.Warn().Err(err).Msg("ensureTimeout error")
 		}
-	}
+		return nil
+	})
+
+	st.wg.Done()
 }
 
 func (st *Index) ensureTimeoutOnce() error {

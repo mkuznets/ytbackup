@@ -5,7 +5,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"mkuznets.com/go/ytbackup/internal/history"
-	"mkuznets.com/go/ytbackup/internal/utils"
+	"mkuznets.com/go/ytbackup/internal/utils/ticker"
 )
 
 func (cmd *Command) HistoryCrawler(ctx context.Context) error {
@@ -14,7 +14,7 @@ func (cmd *Command) HistoryCrawler(ctx context.Context) error {
 		return err
 	}
 
-	return utils.RunEveryInterval(ctx, cmd.Config.Sources.UpdateInterval, func() error {
+	return ticker.New(cmd.Config.Sources.UpdateInterval).Do(ctx, func() error {
 		log.Debug().Msg("Watch history: checking for new videos")
 
 		err := bro.Do(ctx, func(ctx context.Context, url string) error {

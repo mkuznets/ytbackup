@@ -12,6 +12,7 @@ import (
 	"mkuznets.com/go/ytbackup/internal/python"
 	"mkuznets.com/go/ytbackup/internal/storages"
 	"mkuznets.com/go/ytbackup/internal/utils"
+	"mkuznets.com/go/ytbackup/internal/utils/ticker"
 )
 
 const (
@@ -25,7 +26,7 @@ type Result struct {
 }
 
 func (cmd *Command) Serve(ctx context.Context) error {
-	return utils.RunEveryInterval(ctx, 5*time.Second, func() error {
+	return ticker.New(5*time.Second).Do(ctx, func() error {
 		videos, err := cmd.Index.Pop(1)
 		if err != nil {
 			log.Err(err).Msg("index: Pop error")
@@ -120,7 +121,7 @@ func (cmd *Command) downloadByID(video *index.Video, rootDir string) ([]*Result,
 	}
 
 	go func() {
-		_ = utils.RunEveryInterval(rctx, 30*time.Second, func() error {
+		ticker.New(30*time.Second).MustDo(rctx, func() error {
 			cmd.Index.Beat(video.ID)
 			return nil
 		})

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"mkuznets.com/go/ytbackup/internal/utils/ticker"
 )
 
 type Python struct {
@@ -65,36 +66,29 @@ func (py *Python) Init(ctx context.Context) error {
 
 	py.wg.Add(1)
 	go func() {
+		defer py.wg.Done()
+
 		log.Debug().
 			Stringer("interval", py.ydlUpdateInterval).
 			Msg("Starting youtube-dl updater")
 
-		defer py.wg.Done()
-		ticker := time.NewTicker(py.ydlUpdateInterval)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				if ctx.Err() != nil {
-					return
-				}
-				py.runLock.Lock()
+		ticker.New(py.ydlUpdateInterval, ticker.SkipFirst).MustDo(ctx, func() error {
+			py.runLock.Lock()
+			defer py.runLock.Unlock()
 
-				upgraded, err := py.ensureYDL(ctx)
-				if err != nil {
-					log.Warn().Err(err).Msg("youtube-dl upgrade error")
-				}
-
-				if upgraded {
-					if err := py.ensurePyCache(ctx); err != nil {
-						log.Warn().Err(err).Msg("python cache error")
-					}
-				}
-
-				py.runLock.Unlock()
+			upgraded, err := py.ensureYDL(ctx)
+			if err != nil {
+				log.Warn().Err(err).Msg("youtube-dl upgrade error")
+				return nil
 			}
-		}
+
+			if upgraded {
+				if err := py.ensurePyCache(ctx); err != nil {
+					log.Warn().Err(err).Msg("python cache error")
+				}
+			}
+			return nil
+		})
 	}()
 
 	py.initialised = true

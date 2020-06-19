@@ -10,6 +10,7 @@ import (
 	"google.golang.org/api/youtube/v3"
 	"mkuznets.com/go/ytbackup/internal/index"
 	"mkuznets.com/go/ytbackup/internal/utils"
+	"mkuznets.com/go/ytbackup/internal/utils/ticker"
 	yt "mkuznets.com/go/ytbackup/internal/youtube"
 )
 
@@ -21,7 +22,7 @@ func (cmd *Command) Enqueuer(ctx context.Context) error {
 
 	endpoint := service.Videos.List("snippet,contentDetails")
 
-	return utils.RunEveryInterval(ctx, 5*time.Second, func() error {
+	return ticker.New(5*time.Second).Do(ctx, func() error {
 		videos, err := cmd.Index.Get(index.StatusNew, 50)
 		if err != nil {
 			log.Err(err).Msg("Index error")
