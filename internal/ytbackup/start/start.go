@@ -7,9 +7,9 @@ import (
 )
 
 type Command struct {
-	DisableDownload bool `long:"disable-download" description:"do not download new videos" env:"YTBACKUP_DISABLE_DOWNLOAD"`
 	ytbackup.Command
-	Python *python.Python
+	DisableDownload bool `long:"disable-download" description:"do not download new videos" env:"YTBACKUP_DISABLE_DOWNLOAD"`
+	Python          *python.Python
 }
 
 func (cmd *Command) Execute([]string) error {
@@ -36,7 +36,7 @@ func (cmd *Command) Execute([]string) error {
 				Stringer("interval", cmd.Config.Sources.UpdateInterval).
 				Msg("Watch history crawler: starting")
 
-			if err := cmd.HistoryCrawler(cmd.Ctx); err != nil {
+			if err := cmd.RunHistoryCrawler(cmd.Ctx); err != nil {
 				log.Err(err).Msg("Watch history crawler")
 				return
 			}
@@ -52,7 +52,7 @@ func (cmd *Command) Execute([]string) error {
 				Stringer("interval", cmd.Config.Sources.UpdateInterval).
 				Msg("Playlists crawler: starting")
 
-			if err := cmd.APICrawler(cmd.Ctx); err != nil {
+			if err := cmd.RunAPICrawler(cmd.Ctx); err != nil {
 				log.Err(err).Msg("Playlists crawler")
 				return
 			}
@@ -65,13 +65,13 @@ func (cmd *Command) Execute([]string) error {
 
 		cmd.Wg.Add(1)
 		go func() {
-			if err := cmd.Enqueuer(cmd.Ctx); err != nil {
+			if err := cmd.RunEnqueuer(cmd.Ctx); err != nil {
 				log.Err(err).Msg("Enqueuer error")
 			}
-			defer cmd.Wg.Done()
+			cmd.Wg.Done()
 		}()
 
-		if err := cmd.Serve(cmd.Ctx); err != nil {
+		if err := cmd.RunDownloader(cmd.Ctx); err != nil {
 			return err
 		}
 		log.Info().Msg("Downloader: stopped")

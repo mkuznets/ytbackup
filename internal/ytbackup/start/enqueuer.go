@@ -14,7 +14,7 @@ import (
 	yt "mkuznets.com/go/ytbackup/internal/youtube"
 )
 
-func (cmd *Command) Enqueuer(ctx context.Context) error {
+func (cmd *Command) RunEnqueuer(ctx context.Context) error {
 	service, err := yt.NewService(cmd.Ctx, cmd.Config.Youtube.OAuth.Token())
 	if err != nil {
 		return err

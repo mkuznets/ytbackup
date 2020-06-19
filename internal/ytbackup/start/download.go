@@ -10,7 +10,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"mkuznets.com/go/ytbackup/internal/index"
 	"mkuznets.com/go/ytbackup/internal/python"
-	"mkuznets.com/go/ytbackup/internal/storages"
 	"mkuznets.com/go/ytbackup/internal/utils"
 	"mkuznets.com/go/ytbackup/internal/utils/ticker"
 )
@@ -20,12 +19,14 @@ const (
 	ytVideoURLFormat    = "https://www.youtube.com/watch?v=%s"
 )
 
+type videoIDKey struct{}
+
 type Result struct {
 	ID    string
 	Files []index.File
 }
 
-func (cmd *Command) Serve(ctx context.Context) error {
+func (cmd *Command) RunDownloader(ctx context.Context) error {
 	return ticker.New(5*time.Second).Do(ctx, func() error {
 		videos, err := cmd.Index.Pop(1)
 		if err != nil {
@@ -34,19 +35,20 @@ func (cmd *Command) Serve(ctx context.Context) error {
 		}
 
 		if len(videos) > 0 {
-			storage, err := cmd.Storages.Get()
-			if err != nil {
-				log.Err(err).Msgf("no suitable storage, sleeping for %s", systemErrorDowntime)
-				utils.SleepContext(ctx, systemErrorDowntime)
-				return nil
-			}
-			cmd.fetchNew(ctx, videos, storage)
+			cmd.download(ctx, videos)
 		}
 		return nil
 	})
 }
 
-func (cmd *Command) fetchNew(ctx context.Context, videos []*index.Video, storage *storages.Ready) {
+func (cmd *Command) download(ctx context.Context, videos []*index.Video) {
+	storage, err := cmd.Storages.Get()
+	if err != nil {
+		log.Err(err).Msgf("no suitable storage, sleeping for %s", systemErrorDowntime)
+		utils.SleepContext(ctx, systemErrorDowntime)
+		return
+	}
+
 	for _, video := range videos {
 		log.Info().Str("id", video.ID).Msg("Downloading")
 
@@ -94,8 +96,10 @@ func (cmd *Command) fetchNew(ctx context.Context, videos []*index.Video, storage
 }
 
 func (cmd *Command) downloadByID(video *index.Video, rootDir string) ([]*Result, error) {
-	rctx, cancel := context.WithCancel(cmd.CriticalCtx)
+	ctx, cancel := context.WithCancel(cmd.CriticalCtx)
 	defer cancel()
+
+	ctx = context.WithValue(ctx, videoIDKey{}, video.ID)
 
 	published := video.Meta.PublishedAt
 	destDir := filepath.Join(
@@ -121,15 +125,15 @@ func (cmd *Command) downloadByID(video *index.Video, rootDir string) ([]*Result,
 	}
 
 	go func() {
-		ticker.New(30*time.Second).MustDo(rctx, func() error {
+		ticker.New(30*time.Second).MustDo(ctx, func() error {
 			cmd.Index.Beat(video.ID)
 			return nil
 		})
 	}()
-	go trackProgress(rctx, cancel, logPath, video.ID)
+	go trackProgress(ctx, cancel, logPath)
 
 	var result []*Result
-	if err := cmd.Python.RunScript(rctx, &result, cargs...); err != nil {
+	if err := cmd.Python.RunScript(ctx, &result, cargs...); err != nil {
 		return nil, err
 	}
 

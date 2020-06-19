@@ -8,7 +8,7 @@ import (
 	"mkuznets.com/go/ytbackup/internal/utils/ticker"
 )
 
-func (cmd *Command) HistoryCrawler(ctx context.Context) error {
+func (cmd *Command) RunHistoryCrawler(ctx context.Context) error {
 	bro, err := cmd.Config.Browser.New()
 	if err != nil {
 		return err

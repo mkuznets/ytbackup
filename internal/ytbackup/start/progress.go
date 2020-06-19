@@ -17,7 +17,7 @@ const (
 	progressInterval = 5 * time.Second
 	idleTimeout      = 3 * time.Minute
 
-	leftWarning = time.Minute
+	leftWarning = time.Millisecond
 )
 
 type Progress struct {
@@ -27,19 +27,25 @@ type Progress struct {
 	Finished   bool
 }
 
-func trackProgress(ctx context.Context, cancel context.CancelFunc, path, id string) {
+func trackProgress(ctx context.Context, cancel context.CancelFunc, path string) {
+	logCtx := log.With()
+	if videoID := ctx.Value(videoIDKey{}); videoID != nil {
+		logCtx = logCtx.Str("id", videoID.(string))
+	}
+	logger := logCtx.Logger()
+
 	cfg := tail.Config{Follow: true, Logger: tail.DiscardingLogger}
 
 	mainLog, err := tail.TailFile(path, cfg)
 	if err != nil {
-		log.Warn().Err(err).Msg("Could not track progress")
+		logger.Warn().Err(err).Msg("Could not track progress")
 		return
 	}
 
 	ffmpegPath := strings.Replace(path, ".log", "-ffmpeg.log", 1)
 	ffmpegLog, err := tail.TailFile(ffmpegPath, cfg)
 	if err != nil {
-		log.Warn().Err(err).Msg("Could not track progress")
+		logger.Warn().Err(err).Msg("Could not track progress")
 		return
 	}
 
@@ -55,12 +61,12 @@ func trackProgress(ctx context.Context, cancel context.CancelFunc, path, id stri
 			idle := time.Since(*last)
 			left := idleTimeout - idle
 			if idle >= idleTimeout {
-				log.Error().Msg("Stopping idle download")
+				logger.Error().Msg("Stopping idle download")
 				cancel()
 				return
 			}
 			if left <= leftWarning {
-				log.Warn().Msgf("Download is idle, will be stopped in %s", left.Truncate(time.Second))
+				logger.Warn().Msgf("Download is idle, will be stopped in %s", left.Truncate(time.Second))
 			}
 			sleep := 10 * time.Second
 			if left < sleep {
@@ -81,7 +87,7 @@ Loop:
 				break Loop
 			}
 			if line.Err != nil {
-				log.Warn().Err(err).Msg("Tail error")
+				logger.Warn().Err(err).Msg("Tail error")
 				break Loop
 			}
 
@@ -98,7 +104,7 @@ Loop:
 			}
 
 			if limiter.Allow() || progress.Finished {
-				ev := log.Info().Str("pc", progress.Done).Str("id", id)
+				ev := logger.Info().Str("pc", progress.Done)
 				if progress.Downloaded > 0 {
 					ev = ev.Str("dl", utils.IBytes(progress.Downloaded))
 				}
@@ -113,13 +119,9 @@ Loop:
 		}
 	}
 
-	cleanupTails(mainLog, ffmpegLog)
-}
-
-func cleanupTails(tails ...*tail.Tail) {
-	for _, t := range tails {
+	for _, t := range [2]*tail.Tail{mainLog, ffmpegLog} {
 		if err := t.Stop(); err != nil {
-			log.Debug().Err(err).Msg("Could not close tail")
+			logger.Debug().Err(err).Msg("Could not close tail")
 		}
 		t.Cleanup()
 	}
