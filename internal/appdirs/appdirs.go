@@ -12,7 +12,6 @@ var (
 	Data   string
 	Config string
 	Cache  string
-	State  string
 )
 
 func Reload() {
