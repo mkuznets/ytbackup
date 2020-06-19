@@ -21,7 +21,7 @@ func (cmd *ListCommand) Execute([]string) error {
 	if !cmd.JSON {
 		tw := tabwriter.NewWriter(os.Stdout, 0, 1, 2, ' ', 0)
 
-		err := cmd.Index.Map(status, func(video *index.Video) error {
+		err := cmd.Index.Iter(status, func(video *index.Video) error {
 			if _, err := fmt.Fprintln(tw, video.Row()); err != nil {
 				return err
 			}
@@ -38,7 +38,7 @@ func (cmd *ListCommand) Execute([]string) error {
 	}
 
 	items := make([]*index.Video, 0)
-	err := cmd.Index.Map(status, func(video *index.Video) error {
+	err := cmd.Index.Iter(status, func(video *index.Video) error {
 		items = append(items, video)
 		return nil
 	})

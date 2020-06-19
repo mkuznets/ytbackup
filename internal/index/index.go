@@ -21,7 +21,7 @@ var (
 	retryDelay     = 30 * time.Second
 	bucketItems    = []byte("items")
 	bucketStatuses = []byte("statuses")
-	ErrStop        = errors.New("map stop")
+	ErrStop        = errors.New("iteration stopped")
 )
 
 type RetryMode uint8
@@ -129,7 +129,7 @@ func (st *Index) Pop(n int) ([]*Video, error) {
 	err := st.db.Update(func(tx *bolt.Tx) error {
 		i := 0
 
-		return mapItems(tx, StatusEnqueued, func(video *Video) error {
+		return iterItems(tx, StatusEnqueued, func(video *Video) error {
 			if video.RetryAfter != nil && video.RetryAfter.After(time.Now()) {
 				return nil
 			}
@@ -163,7 +163,7 @@ func (st *Index) Get(status Status, n int) ([]*Video, error) {
 	i := 0
 	videos := make([]*Video, 0, n)
 
-	err := st.Map(status, func(video *Video) error {
+	err := st.Iter(status, func(video *Video) error {
 		videos = append(videos, video)
 		i++
 		if i >= n {
@@ -225,9 +225,9 @@ func (st *Index) Put(videos ...*Video) error {
 	})
 }
 
-func (st *Index) Map(status Status, f func(*Video) error) error {
+func (st *Index) Iter(status Status, f func(*Video) error) error {
 	return st.db.View(func(tx *bolt.Tx) error {
-		return mapItems(tx, status, func(video *Video) error {
+		return iterItems(tx, status, func(video *Video) error {
 			return f(video)
 		})
 	})
@@ -246,7 +246,7 @@ func (st *Index) ensureTimeout(ctx context.Context) {
 
 func (st *Index) ensureTimeoutOnce() error {
 	return st.db.Update(func(tx *bolt.Tx) error {
-		return mapItems(tx, StatusInProgress, func(video *Video) error {
+		return iterItems(tx, StatusInProgress, func(video *Video) error {
 			if video.Deadline == nil {
 				log.Error().
 					Str("id", video.ID).
@@ -377,7 +377,7 @@ func put(tx *bolt.Tx, video *Video, replace bool) (ok bool, err error) {
 	return true, nil
 }
 
-func mapItems(tx *bolt.Tx, status Status, f func(*Video) error) error {
+func iterItems(tx *bolt.Tx, status Status, f func(*Video) error) error {
 	cur := tx.Bucket(bucketStatuses).Cursor()
 	prefix := []byte(status)
 

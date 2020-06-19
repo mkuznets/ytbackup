@@ -23,7 +23,7 @@ func (cmd *FilesCommand) Execute([]string) error {
 		sts[st.ID] = st.Path
 	}
 
-	err := cmd.Index.Map(index.StatusDone, func(video *index.Video) error {
+	err := cmd.Index.Iter(index.StatusDone, func(video *index.Video) error {
 		for _, st := range video.Storages {
 			path, ok := sts[st.ID]
 			if !ok {
