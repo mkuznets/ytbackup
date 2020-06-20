@@ -141,10 +141,8 @@ func (cmd *Command) downloadByID(video *index.Video, rootDir string) ([]*Result,
 }
 
 func isSystemError(err error) bool {
-	if e, ok := err.(*python.ScriptError); ok && e.Reason == "system" {
-		return true
-	}
-	return false
+	e, ok := err.(*python.ScriptError)
+	return ok && e.Reason == "system"
 }
 
 func isRetriable(err error) bool {
