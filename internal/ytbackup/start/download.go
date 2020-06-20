@@ -155,6 +155,7 @@ func isRetriable(err error) bool {
 		strings.Contains(text, "copyright grounds") ||
 		strings.Contains(text, "in your country") ||
 		strings.Contains(text, "confirm your age") ||
+		strings.Contains(text, "recording is not available") ||
 		strings.Contains(text, "video is unavailable") {
 		return false
 	}
