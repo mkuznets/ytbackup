@@ -13,4 +13,5 @@ type Options struct {
 	Import *ytbackup.ImportCommand `command:"import" description:"retrieve videos from Google's takeout JSON files"`
 	List   *ytbackup.ListCommand   `command:"list" description:""`
 	Check  *check.Command          `command:"check"`
+	Add    *ytbackup.AddCommand    `command:"add" description:"Add videos by ID"`
 }

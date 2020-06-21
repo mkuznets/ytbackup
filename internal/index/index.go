@@ -180,14 +180,12 @@ func (st *Index) Get(status Status, n int) ([]*Video, error) {
 
 func (st *Index) Retry(id string, mode RetryMode) error {
 	return st.db.Update(func(tx *bolt.Tx) error {
-		value := tx.Bucket(bucketItems).Get([]byte(id))
-		if value == nil {
-			return nil
-		}
-
-		var video Video
-		if err := json.Unmarshal(value, &video); err != nil {
+		video, err := getByID(tx, []byte(id))
+		if err != nil {
 			return err
+		}
+		if video == nil {
+			return nil
 		}
 
 		video.Status = StatusEnqueued
@@ -204,7 +202,7 @@ func (st *Index) Retry(id string, mode RetryMode) error {
 		}
 
 		log.Info().Str("id", id).Msg("Retry later")
-		if _, err := put(tx, &video, true); err != nil {
+		if _, err := put(tx, video, true); err != nil {
 			return err
 		}
 
@@ -221,6 +219,35 @@ func (st *Index) Put(videos ...*Video) error {
 				return err
 			}
 		}
+		return nil
+	})
+}
+
+func (st *Index) PutByID(force bool, ids ...string) error {
+	return st.db.Update(func(tx *bolt.Tx) error {
+		existing := make([]string, 0)
+
+		for _, id := range ids {
+			video, err := getByID(tx, []byte(id))
+			if err != nil {
+				return err
+			}
+			if video != nil {
+				existing = append(existing, video.ID)
+			}
+		}
+
+		if !force && len(existing) > 0 {
+			return fmt.Errorf("IDs already exist: %v", existing)
+		}
+
+		for _, id := range ids {
+			video := &Video{ID: id, Status: StatusNew}
+			if _, err := put(tx, video, true); err != nil {
+				return err
+			}
+		}
+
 		return nil
 	})
 }
@@ -347,15 +374,13 @@ func put(tx *bolt.Tx, video *Video, replace bool) (ok bool, err error) {
 		panic(".Status is required")
 	}
 
-	oldItem := tx.Bucket(bucketItems).Get(video.Key())
-	if oldItem != nil {
+	oldVideo, err := getByID(tx, video.Key())
+	if err != nil {
+		return false, err
+	}
+	if oldVideo != nil {
 		if !replace {
 			return false, nil
-		}
-
-		var oldVideo Video
-		if err := json.Unmarshal(oldItem, &oldVideo); err != nil {
-			return false, fmt.Errorf("could not unmarshal key %s: %v", video.Key(), err)
 		}
 		if err := tx.Bucket(bucketStatuses).Delete(oldVideo.StatusKey()); err != nil {
 			return false, err
@@ -382,15 +407,15 @@ func iterItems(tx *bolt.Tx, status Status, f func(*Video) error) error {
 	prefix := []byte(status)
 
 	for key, videoID := cur.Seek(prefix); key != nil && bytes.HasPrefix(key, prefix); key, videoID = cur.Next() {
-		data := tx.Bucket(bucketItems).Get(videoID)
-		if data == nil {
-			return fmt.Errorf("inconsistent index: %s", videoID)
-		}
-		var video Video
-		if err := json.Unmarshal(data, &video); err != nil {
+		video, err := getByID(tx, videoID)
+		if err != nil {
 			return err
 		}
-		if err := f(&video); err != nil {
+		if video == nil {
+			return fmt.Errorf("inconsistent index: %s", videoID)
+		}
+
+		if err := f(video); err != nil {
 			if errors.Is(err, ErrStop) {
 				return nil
 			}
@@ -399,4 +424,16 @@ func iterItems(tx *bolt.Tx, status Status, f func(*Video) error) error {
 	}
 
 	return nil
+}
+
+func getByID(tx *bolt.Tx, id []byte) (*Video, error) {
+	data := tx.Bucket(bucketItems).Get(id)
+	if data == nil {
+		return nil, nil
+	}
+	var video Video
+	if err := json.Unmarshal(data, &video); err != nil {
+		return nil, fmt.Errorf("could not parse value for key %s: %v", id, err)
+	}
+	return &video, nil
 }
