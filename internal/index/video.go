@@ -2,11 +2,7 @@ package index
 
 import (
 	"fmt"
-	"regexp"
-	"strings"
 	"time"
-
-	"github.com/mattn/go-runewidth"
 )
 
 type Status string
@@ -19,13 +15,6 @@ const (
 	StatusDone       Status = "DONE"
 	StatusFailed     Status = "FAILED"
 	StatusAny        Status = ""
-)
-
-var (
-	reContentWarning = regexp.MustCompile(`.+Content Warning(.*)`)
-	reYoutubeSaid    = regexp.MustCompile(`.+YouTube said:(.*)`)
-	reSorry          = regexp.MustCompile(`(.+)Sorry.*`)
-	reSpaces         = regexp.MustCompile(`\s+`)
 )
 
 type Video struct {
@@ -54,21 +43,6 @@ func (v *Video) ClearSystem() {
 	v.Deadline = nil
 }
 
-func (v *Video) Row() string {
-	line := fmt.Sprintf("%s\t%s%s\t%s", v.ID, v.Status, v.Meta.Row(), v.ShortReason())
-	line = strings.ReplaceAll(line, "\n", " ")
-	return line
-}
-
-func (v *Video) ShortReason() string {
-	r := reContentWarning.ReplaceAllString(v.Reason, "$1")
-	r = reYoutubeSaid.ReplaceAllString(r, "$1")
-	r = reSpaces.ReplaceAllString(r, " ")
-	r = reSorry.ReplaceAllString(r, "$1")
-	r = strings.TrimSpace(r)
-	return Truncate(r, 90)
-}
-
 type Storage struct {
 	ID string `json:"id"`
 }
@@ -86,21 +60,4 @@ type Meta struct {
 	ChannelTitle string    `json:"channel_title,omitempty"`
 	Tags         []string  `json:"tags,omitempty"`
 	PublishedAt  time.Time `json:"published_at,omitempty"`
-}
-
-func (meta *Meta) Row() string {
-	if meta == nil {
-		return "\t\t\t"
-	}
-
-	return fmt.Sprintf(
-		"\t%s\t%s\t%s",
-		meta.PublishedAt.Format("2006-01-02"),
-		Truncate(meta.ChannelTitle, 20),
-		Truncate(meta.Title, 30),
-	)
-}
-
-func Truncate(s string, n int) string {
-	return runewidth.Truncate(s, n, "...")
 }
