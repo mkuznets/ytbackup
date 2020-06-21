@@ -19,7 +19,7 @@ func (cmd *ListCommand) Execute([]string) error {
 	status := index.Status(cmd.Status)
 
 	if !cmd.JSON {
-		tw := tabwriter.NewWriter(os.Stdout, 0, 1, 2, ' ', 0)
+		tw := tabwriter.NewWriter(os.Stdout, 10, 1, 2, ' ', 0)
 
 		err := cmd.Index.Iter(status, func(video *index.Video) error {
 			if _, err := fmt.Fprintln(tw, video.Row()); err != nil {

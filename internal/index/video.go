@@ -2,8 +2,11 @@ package index
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
+
+	"github.com/mattn/go-runewidth"
 )
 
 type Status string
@@ -16,6 +19,13 @@ const (
 	StatusDone       Status = "DONE"
 	StatusFailed     Status = "FAILED"
 	StatusAny        Status = ""
+)
+
+var (
+	reContentWarning = regexp.MustCompile(`.+Content Warning(.*)`)
+	reYoutubeSaid    = regexp.MustCompile(`.+YouTube said:(.*)`)
+	reSorry          = regexp.MustCompile(`(.+)Sorry.*`)
+	reSpaces         = regexp.MustCompile(`\s+`)
 )
 
 type Video struct {
@@ -45,21 +55,18 @@ func (v *Video) ClearSystem() {
 }
 
 func (v *Video) Row() string {
-	line := fmt.Sprintf("%s\t%s", v.Status, v.ID)
-
-	switch v.Status {
-	case StatusSkipped:
-		line += fmt.Sprintf("\t%s", v.Reason)
-	case StatusFailed:
-		line += fmt.Sprintf("\t%s", v.Reason)
-	case StatusDone:
-		if v.Meta != nil {
-			line += v.Meta.Row()
-		}
-	}
+	line := fmt.Sprintf("%s\t%s%s\t%s", v.ID, v.Status, v.Meta.Row(), v.ShortReason())
 	line = strings.ReplaceAll(line, "\n", " ")
-
 	return line
+}
+
+func (v *Video) ShortReason() string {
+	r := reContentWarning.ReplaceAllString(v.Reason, "$1")
+	r = reYoutubeSaid.ReplaceAllString(r, "$1")
+	r = reSpaces.ReplaceAllString(r, " ")
+	r = reSorry.ReplaceAllString(r, "$1")
+	r = strings.TrimSpace(r)
+	return Truncate(r, 90)
 }
 
 type Storage struct {
@@ -82,10 +89,18 @@ type Meta struct {
 }
 
 func (meta *Meta) Row() string {
+	if meta == nil {
+		return "\t\t\t"
+	}
+
 	return fmt.Sprintf(
 		"\t%s\t%s\t%s",
 		meta.PublishedAt.Format("2006-01-02"),
-		meta.ChannelTitle,
-		meta.Title,
+		Truncate(meta.ChannelTitle, 20),
+		Truncate(meta.Title, 30),
 	)
+}
+
+func Truncate(s string, n int) string {
+	return runewidth.Truncate(s, n, "...")
 }
