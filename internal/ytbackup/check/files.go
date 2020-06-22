@@ -13,7 +13,7 @@ import (
 )
 
 type FilesCommand struct {
-	Hashes bool `long:"hashes"`
+	Hashes bool `long:"hashes" description:"Verify checksums"`
 	ytbackup.Command
 }
 

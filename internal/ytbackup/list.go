@@ -10,8 +10,8 @@ import (
 )
 
 type ListCommand struct {
-	Status string `short:"s" long:"status" choice:"DONE" choice:"NEW" choice:"ENQUEUED" choice:"FAILED" choice:"SKIPPED" choice:"INPROGRESS" description:""` // nolint
-	JSON   bool   `long:"json" description:""`
+	Status string `short:"s" long:"status" description:"Filter videos by status. Valid options: NEW, ENQUEUED, DONE, INPROGRESS, FAILED, SKIPPED."`
+	JSON   bool   `long:"json" description:"JSON output"`
 	Command
 }
 

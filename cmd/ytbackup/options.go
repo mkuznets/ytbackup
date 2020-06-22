@@ -8,11 +8,11 @@ import (
 
 type Options struct {
 	Common  *ytbackup.Options        `group:"Common Options"`
-	Start   *start.Command           `command:"start" description:""`
-	Setup   *ytbackup.SetupCommand   `command:"setup" description:""`
-	Import  *ytbackup.ImportCommand  `command:"import" description:"retrieve videos from Google's takeout JSON files"`
-	List    *ytbackup.ListCommand    `command:"list" description:""`
-	Check   *check.Command           `command:"check"`
-	Add     *ytbackup.AddCommand     `command:"add" description:"Add videos by ID"`
+	Start   *start.Command           `command:"start" description:"Start pulling sources and downloading videos"`
+	Setup   *ytbackup.SetupCommand   `command:"setup" description:"Configure OAuth token for Youtube API"`
+	Import  *ytbackup.ImportCommand  `command:"import" description:"Import videos from Google's takeout JSON files"`
+	List    *ytbackup.ListCommand    `command:"list" description:"List videos"`
+	Check   *check.Command           `command:"check" description:"Data integrity checks"`
+	Add     *ytbackup.AddCommand     `command:"add"  description:"Add one or more videos by ID"`
 	Version *ytbackup.VersionCommand `command:"version" description:"Show version"`
 }

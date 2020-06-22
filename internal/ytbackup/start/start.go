@@ -8,7 +8,7 @@ import (
 
 type Command struct {
 	ytbackup.Command
-	DisableDownload bool `long:"disable-download" description:"do not download new videos" env:"YTBACKUP_DISABLE_DOWNLOAD"`
+	DisableDownload bool `long:"disable-download" description:"Do not download videos" env:"YTBACKUP_DISABLE_DOWNLOAD"`
 	Python          *python.Python
 }
 

@@ -19,8 +19,8 @@ import (
 
 // Options is a group of common options for all subcommands.
 type Options struct {
-	ConfigPath string `short:"c" long:"config" description:"custom config path" env:"YTBACKUP_CONFIG"`
-	Debug      bool   `long:"debug" description:"enable debug logging" env:"YTBACKUP_DEBUG"`
+	ConfigPath string `short:"c" long:"config" description:"Config path" env:"YTBACKUP_CONFIG"`
+	Debug      bool   `long:"debug" description:"Enable debug logging" env:"YTBACKUP_DEBUG"`
 }
 
 // Command is a common part of all subcommands.
