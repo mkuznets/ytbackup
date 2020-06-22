@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"text/tabwriter"
 
+	"mkuznets.com/go/tabwriter"
 	"mkuznets.com/go/ytbackup/internal/index"
 )
 
