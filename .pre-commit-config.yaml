@@ -13,4 +13,4 @@ repos:
     rev: v1.27.0
     hooks:
       - id: golangci-lint
-        entry: golangci-lint run -c .golangci.yml
+        entry: golangci-lint run -c .golangci.yaml
