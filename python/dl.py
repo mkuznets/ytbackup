@@ -20,74 +20,25 @@ SYSTEM_EXCS = (urllib.error.URLError, http.client.HTTPException, OSError)
 
 STDERR = sys.stderr
 
-
-# ------------------------------------------------------------------------------
-
-class YDLOpts:
-    common = {
-        'buffersize': 16 * 1024,
-        'quiet': True,
-        'noprogress': True,
-        'youtube_include_dash_manifest': True,
-        'no_color': True,
-        'call_home': False,
-        'ignoreerrors': False,
-        'geo_bypass': True,
-        'verbose': False,
-        'prefer_ffmpeg': True,
-        'noplaylist': True,
-    }
-    download = {
-        'write_all_thumbnails': True,
-        'allsubtitles': True,
-        'writesubtitles': True,
-        'writeinfojson': True,
-    }
-    audio = {
-        'format': 'bestaudio/best',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '64',
-            'nopostoverwrites': True,
-        }],
-        'postprocessor_args': ['-ac', '1']
-    }
-    video = {
-        'format': 'bestvideo+bestaudio/best',
-        'merge_output_format': 'mkv',
-    }
-
-
-class Preset:
-    def __init__(self, *, logger: typing.Optional[logging.Logger] = None):
-        self.logger = logger
-
-    @property
-    def _download_opts(self) -> dict:
-        opts = copy.deepcopy(YDLOpts.common)
-        opts.update(YDLOpts.download)
-        if self.logger:
-            # noinspection PyTypeChecker
-            opts['logger'] = self.logger
-        return opts
-
-    @property
-    def info_opts(self) -> dict:
-        opts = copy.deepcopy(YDLOpts.common)
-        return opts
-
-    @property
-    def audio(self) -> dict:
-        opts = self._download_opts
-        opts.update(YDLOpts.audio)
-        return opts
-
-    @property
-    def video(self) -> dict:
-        opts = self._download_opts
-        opts.update(YDLOpts.video)
-        return opts
+YDL_OPTIONS = {
+    'buffersize': 16 * 1024,
+    'quiet': True,
+    'noprogress': True,
+    'youtube_include_dash_manifest': True,
+    'no_color': True,
+    'call_home': False,
+    'ignoreerrors': False,
+    'geo_bypass': True,
+    'verbose': False,
+    'prefer_ffmpeg': True,
+    'noplaylist': True,
+    'write_all_thumbnails': True,
+    'allsubtitles': True,
+    'writesubtitles': True,
+    'writeinfojson': True,
+    'format': 'bestvideo+bestaudio/best',
+    'merge_output_format': 'mkv',
+}
 
 
 # ------------------------------------------------------------------------------
@@ -198,8 +149,9 @@ class Download:
 
         # ----------------------------------------------------------------------
 
-        opts = getattr(Preset(logger=self.logger), args.preset)
+        opts = copy.copy(YDL_OPTIONS)
         opts.update(
+            logger=self.logger,
             outtmpl=os.path.join(self.output_dir, '%(id)s/%(id)s.%(ext)s'),
             progress_hooks=[create_progress_hook(self.logger)],
             cachedir=cache_dir,
@@ -270,30 +222,20 @@ class Download:
         return result
 
 
-def arg_parser():
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--log')
+    parser.add_argument('--root', required=True)
+    parser.add_argument('--dst', required=True)
+    parser.add_argument('--cache')
+    parser.add_argument('url')
 
-    subparsers = parser.add_subparsers(dest='command')
-
-    subcmd = subparsers.add_parser('download')
-    subcmd.set_defaults(func=Download)
-    subcmd.add_argument('--root', required=True)
-    subcmd.add_argument('--dst', required=True)
-    subcmd.add_argument('--cache')
-    subcmd.add_argument('--preset', choices=['video', 'audio'], default='video')
-    subcmd.add_argument('url')
-
-    return parser
-
-
-def main():
-    args = arg_parser().parse_args()
+    args = parser.parse_args()
     logger = get_logger(args.log)
 
     try:
         with suppress_output():
-            result = args.func(args).execute()
+            result = Download(args).execute()
         json_dump(result, sys.stdout)
 
     except Exception as exc:
@@ -305,11 +247,7 @@ def main():
             msg = '{}: {}'.format(exc.__class__.__name__, str(exc))
             reason = 'unknown'
 
-        json_dump({
-            'error': msg,
-            'reason': reason,
-        }, sys.stderr)
-
+        json_dump({'error': msg, 'reason': reason}, sys.stderr)
         sys.exit(0xE7)
 
 

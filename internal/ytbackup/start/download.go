@@ -117,7 +117,6 @@ func (cmd *Command) downloadByID(video *index.Video, rootDir string) ([]*Result,
 	cargs := []string{
 		"dl.py",
 		"--log=" + logPath,
-		"download",
 		"--root=" + rootDir,
 		"--cache=" + cmd.Config.Dirs.Cache,
 		"--dst=" + destDir,
