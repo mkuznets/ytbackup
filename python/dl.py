@@ -45,7 +45,6 @@ YDL_OPTIONS = {
 
 
 class Error(Exception):
-
     def __init__(self, *args, reason=None, **kwargs):
         self.reason = reason or 'unknown'
         # noinspection PyArgumentList
@@ -54,11 +53,7 @@ class Error(Exception):
 
 def json_dump(data, f: typing.TextIO):
     json.dump(
-        data, f,
-        indent=2,
-        skipkeys=True,
-        ensure_ascii=False,
-        default=lambda x: None,
+        data, f, indent=2, skipkeys=True, ensure_ascii=False, default=lambda x: None,
     )
     f.write('\n')
 
@@ -71,7 +66,7 @@ def suppress_output():
 
 
 def get_logger(filename: typing.Optional[str] = None) -> logging.Logger:
-    logger = logging.getLogger("log")
+    logger = logging.getLogger('log')
     logger.setLevel(logging.DEBUG)
 
     if not logger.handlers:
@@ -105,7 +100,7 @@ def create_progress_hook(logger):
             report['total'] = size_total
             report['done'] = '%.2f%%' % (size_done * 100 / size_total)
 
-        logger.info("__progress__ %s", json.dumps(report))
+        logger.info('__progress__ %s', json.dumps(report))
 
     return log_hook
 
@@ -120,7 +115,7 @@ def sha256sum(filename: str, logger: logging.Logger) -> str:
         for i, n in enumerate(iter(lambda: f.readinto(mv), 0)):
             total += n
             if not (i % 160):
-                logger.info("sha256: %d", total)
+                logger.info('sha256: %d', total)
             h.update(mv[:n])
     return h.hexdigest()
 
@@ -140,7 +135,7 @@ class Download:
 
         self.root = os.path.abspath(os.path.expanduser(args.root))
 
-        self.output_dir = tmp_dir = os.path.join(self.root, ".tmp")
+        self.output_dir = tmp_dir = os.path.join(self.root, '.tmp')
         os.makedirs(self.output_dir, exist_ok=True)
 
         # Cache for youtube-dl
@@ -186,38 +181,37 @@ class Download:
             raise
 
         if not infos:
-            raise Error("result is empty")
+            raise Error('result is empty')
 
         result = []
 
         for info in infos.values():
             result_dir = os.path.join(self.output_dir, info['id'])
             if not os.path.exists(result_dir):
-                raise Error("result directory is not found: %s".format(info['id']))
+                raise Error('result directory is not found: %s'.format(info['id']))
 
             shutil.rmtree(self.dest_dir, ignore_errors=True)
             shutil.move(result_dir, self.dest_dir)
 
             files = []
 
-            for path in glob.glob(os.path.join(self.dest_dir, "**"), recursive=True):
-                self.logger.info("output file: %s", path)
+            for path in glob.glob(os.path.join(self.dest_dir, '**'), recursive=True):
+                self.logger.info('output file: %s', path)
                 try:
                     fi = os.stat(path)
                 except OSError as exc:
                     raise Error('could not stat output file') from exc
 
                 if stat.S_ISREG(fi.st_mode):
-                    files.append({
-                        "path": os.path.relpath(path, self.root),
-                        "hash": sha256sum(path, self.logger),
-                        "size": fi.st_size,
-                    })
+                    files.append(
+                        {
+                            'path': os.path.relpath(path, self.root),
+                            'hash': sha256sum(path, self.logger),
+                            'size': fi.st_size,
+                        }
+                    )
 
-            result.append({
-                'id': info['id'],
-                'files': files,
-            })
+            result.append({'id': info['id'], 'files': files})
 
         return result
 
@@ -243,7 +237,7 @@ def main():
             msg = str(exc)
             reason = exc.reason
         else:
-            logger.exception("unknown error")
+            logger.exception('unknown error')
             msg = '{}: {}'.format(exc.__class__.__name__, str(exc))
             reason = 'unknown'
 

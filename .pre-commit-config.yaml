@@ -9,6 +9,15 @@ repos:
         pass_filenames: false
         files: \.(go|py)$
 
+  - repo: local
+    hooks:
+      - id: black
+        name: black
+        language: system
+        entry: black --target-version=py35 --line-length=100 --skip-string-normalization
+        require_serial: true
+        types: [python]
+
   - repo: git://github.com/golangci/golangci-lint
     rev: v1.27.0
     hooks:

@@ -31,11 +31,13 @@ GenericIE = YoutubeIE
 def make_lite():
     extractor_dir = os.path.join('youtube_dl', 'extractor')
 
-    r = subprocess.run([
-        sys.executable,
-        os.path.join('devscripts', 'make_lazy_extractors.py'),
-        os.path.join(extractor_dir, 'lazy_extractors.py'),
-    ])
+    r = subprocess.run(
+        [
+            sys.executable,
+            os.path.join('devscripts', 'make_lazy_extractors.py'),
+            os.path.join(extractor_dir, 'lazy_extractors.py'),
+        ]
+    )
     r.check_returncode()
 
     # noinspection PyUnresolvedReferences
@@ -59,29 +61,28 @@ def make_lite():
 
     os.remove(os.path.join(extractor_dir, 'lazy_extractors.py'))
 
-    r = subprocess.run([sys.executable, "ydl.py", "test"])
+    r = subprocess.run([sys.executable, 'ydl.py', 'test'])
     r.check_returncode()
 
 
 def test():
     import youtube_dl
-    ydl = youtube_dl.YoutubeDL({
-        "cachedir": tempfile.gettempdir(),
-    })
+
+    ydl = youtube_dl.YoutubeDL({'cachedir': tempfile.gettempdir()})
     ydl.process_info = lambda a: None
     ydl.download(['https://www.youtube.com/watch?v=oHg5SJYRHA0'])
 
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        print("command is required")
+        print('command is required')
         sys.exit(1)
 
     cmd = sys.argv[1]
-    if cmd == "make_lite":
+    if cmd == 'make_lite':
         make_lite()
-    elif cmd == "test":
+    elif cmd == 'test':
         test()
     else:
-        print("unknown command")
+        print('unknown command')
         sys.exit(1)
