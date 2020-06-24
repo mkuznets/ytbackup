@@ -22,6 +22,8 @@ STDERR = sys.stderr
 
 YDL_OPTIONS = {
     'buffersize': 16 * 1024,
+    'retries': 5,
+    'fragment_retries': 5,
     'quiet': True,
     'noprogress': True,
     'youtube_include_dash_manifest': True,
