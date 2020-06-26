@@ -40,6 +40,7 @@ func ParseISO8601(s string) (time.Duration, error) {
 	}
 
 	var dur time.Duration
+	dur += time.Duration(d.D) * 24 * time.Hour
 	dur += time.Duration(d.TH) * time.Hour
 	dur += time.Duration(d.TM) * time.Minute
 	dur += time.Duration(d.TS) * time.Second
