@@ -17,7 +17,7 @@ const (
 	progressInterval = 5 * time.Second
 	idleTimeout      = 3 * time.Minute
 
-	leftWarning = time.Millisecond
+	leftWarning = time.Minute
 )
 
 type Progress struct {
