@@ -19,6 +19,7 @@ func (cmd *Command) RunAPICrawler(ctx context.Context) error {
 	return ticker.New(cmd.Config.Sources.UpdateInterval).Do(ctx, func() error {
 		log.Debug().Msg("Playlists: checking for new videos")
 
+	Playlists:
 		for title, playlistID := range cmd.Config.Sources.Playlists {
 			total := 0
 
@@ -29,6 +30,10 @@ func (cmd *Command) RunAPICrawler(ctx context.Context) error {
 			for {
 				response, err := call.Do()
 				if err != nil {
+					if youtube.IsQuotaError(err) {
+						log.Error().Msg("Youtube API quota exceeded")
+						break Playlists
+					}
 					log.Err(err).Msg("Youtube API error")
 					break
 				}
