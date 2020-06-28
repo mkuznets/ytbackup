@@ -14,7 +14,7 @@ repos:
       - id: black
         name: black
         language: system
-        entry: black --target-version=py35 --line-length=100 --skip-string-normalization
+        entry: black --target-version=py35 --line-length=100
         require_serial: true
         types: [python]
 
