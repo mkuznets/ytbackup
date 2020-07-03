@@ -20,7 +20,7 @@ func (cmd *Command) RunEnqueuer(ctx context.Context) error {
 		return err
 	}
 
-	endpoint := service.Videos.List("snippet,contentDetails")
+	endpoint := service.Videos.List([]string{"snippet", "contentDetails"})
 
 	return ticker.New(5*time.Second).Do(ctx, func() error {
 		videos, err := cmd.Index.Get(index.StatusNew, 50)

@@ -23,7 +23,7 @@ func (cmd *Command) RunAPICrawler(ctx context.Context) error {
 		for title, playlistID := range cmd.Config.Sources.Playlists {
 			total := 0
 
-			call := service.PlaylistItems.List("contentDetails")
+			call := service.PlaylistItems.List([]string{"contentDetails"})
 			call = call.PlaylistId(playlistID)
 			call = call.MaxResults(50)
 
