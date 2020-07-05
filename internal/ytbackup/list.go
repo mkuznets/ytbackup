@@ -8,8 +8,9 @@ import (
 )
 
 type ListCommand struct {
-	Status string `short:"s" long:"status" description:"Filter videos by status. Valid options: NEW, ENQUEUED, DONE, INPROGRESS, FAILED, SKIPPED."`
-	JSON   bool   `long:"json" description:"JSON output"`
+	Status  string `short:"s" long:"status" description:"Filter videos by status. Valid options: NEW, ENQUEUED, DONE, INPROGRESS, FAILED, SKIPPED."`
+	JSON    bool   `long:"json" description:"JSON output"`
+	NoTrunc bool   `long:"no-trunc" description:"Don't truncate output"`
 	Command
 }
 
@@ -20,7 +21,7 @@ func (cmd *ListCommand) Execute([]string) error {
 	if cmd.JSON {
 		f = format.NewJSON(os.Stdout)
 	} else {
-		f = format.NewTable(os.Stdout)
+		f = format.NewTable(os.Stdout, cmd.NoTrunc)
 	}
 
 	if err := cmd.Index.Iter(status, f.Put); err != nil {

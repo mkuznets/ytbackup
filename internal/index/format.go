@@ -15,9 +15,25 @@ var (
 	reSpaces         = regexp.MustCompile(`\s+`)
 )
 
-func (v *Video) Row() string {
-	line := fmt.Sprintf("%s\t%s%s\t%s", v.ID, v.Status, v.Meta.row(), v.shortReason())
+func (v *Video) Row(full bool) string {
+	trFunc := truncate
+	if full {
+		trFunc = func(s string, n int) string { return s }
+	}
+
+	meta := "\t\t\t"
+	if v.Meta != nil {
+		meta = fmt.Sprintf(
+			"\t%s\t%s\t%s",
+			v.Meta.PublishedAt.Format("2006-01-02"),
+			trFunc(v.Meta.ChannelTitle, 20),
+			trFunc(v.Meta.Title, 30),
+		)
+	}
+
+	line := fmt.Sprintf("%s\t%s%s\t%s", v.ID, v.Status, meta, trFunc(v.shortReason(), 90))
 	line = strings.ReplaceAll(line, "\n", " ")
+
 	return line
 }
 
@@ -30,20 +46,7 @@ func (v *Video) shortReason() string {
 	r = reSpaces.ReplaceAllString(r, " ")
 	r = reSorry.ReplaceAllString(r, "$1")
 	r = strings.TrimSpace(r)
-	return truncate(r, 90)
-}
-
-func (meta *Meta) row() string {
-	if meta == nil {
-		return "\t\t\t"
-	}
-
-	return fmt.Sprintf(
-		"\t%s\t%s\t%s",
-		meta.PublishedAt.Format("2006-01-02"),
-		truncate(meta.ChannelTitle, 20),
-		truncate(meta.Title, 30),
-	)
+	return r
 }
 
 func truncate(s string, n int) string {

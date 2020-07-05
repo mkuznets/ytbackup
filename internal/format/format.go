@@ -15,17 +15,19 @@ type Formatter interface {
 }
 
 type Table struct {
-	tw *tabwriter.Writer
+	full bool
+	tw   *tabwriter.Writer
 }
 
-func NewTable(w io.Writer) Formatter {
+func NewTable(w io.Writer, full bool) Formatter {
 	return &Table{
-		tw: tabwriter.NewWriter(w, 10, 1, 2, ' ', 0),
+		tw:   tabwriter.NewWriter(w, 10, 1, 2, ' ', 0),
+		full: full,
 	}
 }
 
 func (t *Table) Put(video *index.Video) error {
-	_, err := fmt.Fprintln(t.tw, video.Row())
+	_, err := fmt.Fprintln(t.tw, video.Row(t.full))
 	return err
 }
 
