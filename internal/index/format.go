@@ -22,6 +22,9 @@ func (v *Video) Row() string {
 }
 
 func (v *Video) shortReason() string {
+	if v.Reason == "" {
+		return v.Reason
+	}
 	r := reContentWarning.ReplaceAllString(v.Reason, "$1")
 	r = reYoutubeSaid.ReplaceAllString(r, "$1")
 	r = reSpaces.ReplaceAllString(r, " ")
