@@ -1,6 +1,7 @@
 package python
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -19,9 +20,19 @@ func (py *Python) run(ctx context.Context, args ...string) ([]byte, error) {
 
 	c := exec.CommandContext(ctx, py.executable, args...) // nolint
 	c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
+	c.Env = os.Environ()
+
+	if py.ydlOpts != nil {
+		envBuf := bytes.NewBuffer(nil)
+		envBuf.WriteString("YDL_OPTS=")
+		if err := json.NewEncoder(envBuf).Encode(py.ydlOpts); err != nil {
+			return nil, fmt.Errorf("could not encode youtube-dl options: %v", err)
+		}
+		c.Env = append(c.Env, envBuf.String())
+	}
 
 	c.Dir = py.root
-	c.Env = append(os.Environ(), fmt.Sprintf("PYTHONPATH=%s", py.root))
+	c.Env = append(c.Env, fmt.Sprintf("PYTHONPATH=%s", py.root))
 	return c.CombinedOutput()
 }
 

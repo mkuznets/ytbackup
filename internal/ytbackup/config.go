@@ -54,6 +54,7 @@ type Config struct {
 			Lite           bool
 			Version        string
 			UpdateInterval time.Duration `yaml:"update_interval"`
+			Options        map[string]interface{}
 		} `yaml:"youtube-dl"`
 	}
 	Browser Browser

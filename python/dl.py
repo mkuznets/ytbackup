@@ -146,6 +146,9 @@ class Download:
 
         # ----------------------------------------------------------------------
 
+        custom_opts = json.loads(os.environ.get("YDL_OPTS", "{}"))
+        assert isinstance(custom_opts, dict)
+
         opts = copy.copy(YDL_OPTIONS)
         opts.update(
             logger=self.logger,
@@ -157,6 +160,10 @@ class Download:
         if args.log:
             ffmpeg_log = str(args.log).replace(".log", "-ffmpeg.log")
             opts["postprocessor_args"] = ["-progress", "file:{}".format(ffmpeg_log)]
+
+        if custom_opts:
+            self.logger.info("Custom youtube-dl options: %s", custom_opts)
+            opts.update(custom_opts)
 
         self.opts = opts
 

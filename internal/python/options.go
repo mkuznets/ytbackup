@@ -10,6 +10,12 @@ func WithPython(path string) Option {
 	}
 }
 
+func WithYDLOptions(env map[string]interface{}) Option {
+	return func(py *Python) {
+		py.ydlOpts = env
+	}
+}
+
 func WithYDLUpdateInterval(interval time.Duration) Option {
 	return func(py *Python) {
 		py.ydlUpdateInterval = interval

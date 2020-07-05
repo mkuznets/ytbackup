@@ -21,6 +21,7 @@ func (cmd *Command) Execute([]string) error {
 		python.WithYDLUpdateInterval(pyConf.YoutubeDL.UpdateInterval),
 		python.WithYDLLite(pyConf.YoutubeDL.Lite),
 		python.WithYDLVersion(pyConf.YoutubeDL.Version),
+		python.WithYDLOptions(pyConf.YoutubeDL.Options),
 	)
 
 	if err := cmd.Python.Init(cmd.CriticalCtx); err != nil {

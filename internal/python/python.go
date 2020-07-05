@@ -10,6 +10,7 @@ import (
 )
 
 type Python struct {
+	ydlOpts           map[string]interface{}
 	executable        string
 	root              string
 	runLock           sync.Mutex
