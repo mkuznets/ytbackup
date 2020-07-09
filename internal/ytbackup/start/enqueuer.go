@@ -99,9 +99,12 @@ func (cmd *Command) fromAPIResult(video *index.Video, result *youtube.Video) {
 	}
 	video.Status = index.StatusEnqueued
 
-	if result.Snippet.LiveBroadcastContent == "live" {
+	// TODO: postpone `upcoming` videos until scheduledStartTime
+	// (requires additional request with liveStreamingDetails part)
+	liveStatus := result.Snippet.LiveBroadcastContent
+	if liveStatus == "live" || liveStatus == "upcoming" {
 		video.Status = index.StatusSkipped
-		video.Reason = "live"
+		video.Reason = liveStatus
 	}
 
 	if dur > cmd.Config.Sources.MaxDuration {
