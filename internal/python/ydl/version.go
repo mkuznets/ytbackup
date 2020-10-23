@@ -12,13 +12,13 @@ const (
 	versionFilename = "youtube-dl-version"
 )
 
-func ReadVersion(path string) string {
+func ReadVersion(path string) (string, bool) {
 	versionPath := filepath.Join(path, versionFilename)
 	content, err := ioutil.ReadFile(versionPath)
 	if err != nil {
-		return "unknown"
+		return "nil", false
 	}
-	return string(content)
+	return string(content), true
 }
 
 func WriteVersion(path, version string) error {

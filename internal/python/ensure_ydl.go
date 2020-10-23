@@ -12,11 +12,17 @@ import (
 func (py *Python) ensureYDL(ctx context.Context) (bool, error) {
 	log.Info().Msg("Checking for youtube-dl updates")
 
-	currentVersion := ydl.ReadVersion(py.root)
+	currentVersion, ok := ydl.ReadVersion(py.root)
 	log.Info().Str("version", currentVersion).Msg("Current youtube-dl")
 
 	release, err := ydl.GetRelease(ctx, py.ydlVersion)
 	if err != nil {
+		if ok {
+			log.Err(err).Msg("Could not check youtube-dl updates")
+			log.Warn().Str("version", currentVersion).
+				Msg("Using cached youtube-dl")
+			return true, nil
+		}
 		return false, err
 	}
 
