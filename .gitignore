@@ -17,3 +17,5 @@
 .env
 /*.db*
 /ytbackup*
+
+venv
