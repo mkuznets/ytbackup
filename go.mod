@@ -22,6 +22,7 @@ require (
 	go.etcd.io/bbolt v1.3.4
 	go.uber.org/config v1.4.0
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
+	golang.org/x/sys v0.0.0-20220517195934-5e4e11fc645e // indirect
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e
 	google.golang.org/api v0.28.0
 	gopkg.in/fsnotify.v1 v1.4.7 // indirect
